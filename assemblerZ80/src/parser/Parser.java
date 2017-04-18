@@ -4,136 +4,186 @@ import java.util.LinkedList;
 
 public class Parser {
 	LinkedList<Token> tokens;
-	Token lookAhead;
+	Token lookahead;
 
-	public void parse(LinkedList<Token> tokens) {
+	public Parser() {
+	}// Constructor - Parser
+
+	public ExpressionNode parse(LinkedList<Token> tokens) {
 		this.tokens = (LinkedList<Token>) tokens.clone();
-		lookAhead = this.tokens.getFirst(); // throws no such element if list is empty
+		lookahead = this.tokens.getFirst();
 
-		expression();
+		ExpressionNode expr = expression();
 
-		if (lookAhead.tokenType != TokenType.EPSILON) {
-			throw new ParserException(String.format("Unexpected symbol %s found", lookAhead));
-		}
+		if (lookahead.tokenType != TokenType.EPSILON) {
+			throw new ParserException(String.format("Unexpected symbol %s found)", lookahead));
+		}// if
+
+		return expr;
 	}// parse
 
 	private void nextToken() {
 		tokens.pop();
-		if (tokens.isEmpty()) {
-			lookAhead = new Token(TokenType.EPSILON, "");
+
+		if (tokens.isEmpty()) { // at the end we return an epsilon token
+			lookahead = new Token(TokenType.EPSILON, ""); // -1 ??
 		} else {
-			lookAhead = tokens.getFirst();
-		} // if
+			lookahead = tokens.getFirst();
+		}// if - empty
 	}// nextToken
 
-	private void expression() {
-		// expression -> signed_term sum_op
-		signedTerm();
-		sumOp();
+	private ExpressionNode expression() {
+		// expression -> signed_term_sum_op
+		ExpressionNode expr = signedTerm();
+		return sumOp(expr);
 	}// expression
 
-	private void signedTerm() {
-		if (lookAhead.tokenType == TokenType.PLUS_MINUS) {
-			// signed_term -> PLUS_MINUS term
-			nextToken();
-			term();
-		} else {
-			// signed_term -> term
-			term();
-		} // if
-	}// signedTerm
+	private ExpressionNode sumOp(ExpressionNode expr) {
+		if (lookahead.tokenType == TokenType.PLUS_MINUS) {// sum_op -> PLUSMINUS
+													// term_sum_op
+			AdditionExpressionNode sum;
+			if (expr.getType() == NodeType.ADDITION) {
+				sum = (AdditionExpressionNode) expr;
+			} else {
+				sum = new AdditionExpressionNode(expr, true);
+			}// if
 
-	private void sumOp() {
-		if (lookAhead.tokenType == TokenType.PLUS_MINUS) {
-			// sum_op -> PLUS_MINUS term sum_op
+			boolean positive = lookahead.sequence.equals("+");
 			nextToken();
-			term();
-			sumOp();
-		} else {
-			// sum_op -> EPSILON
-		} // if
-
+			ExpressionNode t = term();
+			sum.add(t, positive);
+			return sumOp(sum);
+		} else { // sumOp -> EPLSILON
+			return expr;
+		}// if
 	}// sumOp
 
-	private void term() {
+	private ExpressionNode signedTerm() {
+		if (lookahead.tokenType == TokenType.PLUS_MINUS) { // signedTerm -> PLUSMINUS
+													// term
+			boolean positive = lookahead.sequence.equals("+");
+			nextToken();
+			ExpressionNode t = term();
+			return (positive) ? t : new AdditionExpressionNode(t, false);
+		} else { // signedTerm -> term
+			return term();
+		}// if
+	}// signedterm
+
+	private ExpressionNode term() {
 		// term -> factor term_op
-		factor();
-		termOp();
+		ExpressionNode f = factor();
+		return termOp(f);
 	}// term
 
-	private void termOp() {
-		if (lookAhead.tokenType == TokenType.MULT_DIV) {
-			// term_op -> MULT_DIV factor term_op
-			nextToken();
-			signedFactor();
-			termOp();
-		} else {
-			// term_op -> EPSILON
-		} // if
-	}// termOp
+	private ExpressionNode termOp(ExpressionNode expression) {
+		if (lookahead.tokenType == TokenType.MULT_DIV) { // term_op -> MULT_DIV factor
+													// term_op
+			MultiplicationExpressionNode prod;
+			if (expression.getType() == NodeType.MULTIPLICATION) {
+				prod = (MultiplicationExpressionNode) expression;
+			} else {
+				prod = new MultiplicationExpressionNode(expression, true);
+			}// inner if - type
 
-	private void factor() {
-		// factor -> argument factor_op
-		argument();
-		factorOp();
-	}// factor
-
-	private void signedFactor() {
-		if (lookAhead.tokenType == TokenType.PLUS_MINUS) {
-			// signedFactor - >PLUS_MINUS factor
+			boolean positive = lookahead.sequence.equals("*");
 			nextToken();
-			factor();
+			ExpressionNode f = signedFactor();
+			prod.add(f, positive);
+			return termOp(prod);
+		}// if
+			// term_op -> EPLSILON
+		return expression;
+	}// termOp()
+
+	private ExpressionNode signedFactor() {
+		if (lookahead.tokenType == TokenType.PLUS_MINUS) { // signed_Factor -> PLUSMINUS
+													// factor
+			boolean positive = lookahead.sequence.equals("+");
+			nextToken();
+			ExpressionNode t = factor();
+			return (positive) ? t : new AdditionExpressionNode(t, false);
 		} else {
-			// signedFactor -> factor
-			factor();
-		} // if
+			// signed_Factor -> factor
+			return factor();
+		}// if
 	}// signedFactor
 
-	private void factorOp() {
-		if (lookAhead.tokenType == TokenType.RAISED) {
-			// factorOp -> RAISED expression
+	public ExpressionNode factor() {
+		// factor -> argument - factor_op
+		ExpressionNode a = argument();
+		return factorOp(a);
+	}// factor
+
+	public ExpressionNode factorOp(ExpressionNode expression) {
+		if (lookahead.tokenType== TokenType.RAISED) { // factor_op -> RAISED expression
 			nextToken();
-			signedFactor();
-		} else {
-			// factorOp -> EPSILON
-		} // if
+			ExpressionNode exponent = signedFactor();
+			return new ExponentiationExpressionNode(expression, exponent);
+		} else { // factor_op ->EPLSILON
+			return expression;
+		}// if
 	}// factorOp
 
-	private void argument() {
-		if (lookAhead.tokenType == TokenType.FUNCTION) {
-			// argument -> FUNCTION argument
+	public ExpressionNode argument() {
+		if (lookahead.tokenType == TokenType.FUNCTION) { // argument -> FUNCTION
+													// argument
+			int function = FunctionExpressionNode.stringToFunction(lookahead.sequence);
 			nextToken();
-			argument();
-		} else if (lookAhead.tokenType == TokenType.OPEN_PARENTHESES) {
-			// argument -> OPEN_PARENTHESES sum CLOSE_PARENTHESES
+			ExpressionNode expr = argument();
+			return new FunctionExpressionNode(function, expr);
+		} else if (lookahead.tokenType == TokenType.OPEN_PARENTHESES) { // argument ->
+															// OPEN_BRACKET sum
+															// CLOSE_BRACKET
 			nextToken();
-			expression();
-			if (lookAhead.tokenType != TokenType.CLOSE_PARENTHESES) {
-				throw new ParserException("Closing parentheses expected and " + lookAhead.sequence + " found instead");
-			} // inner if
-
+			ExpressionNode expr = expression();
+			if (lookahead.tokenType != TokenType.CLOSE_PARENTHESES) {
+				String errMessage = String.format("Closing brackets expected and %s found instead", lookahead.sequence);
+				throw new ParserException(errMessage);
+			}// if - not closing bracket
 			nextToken();
-		} else {
-			// argument -> value
-			value();
-		} // if
+			return expr;
+		} else { // argument -> value
+			return value();
+		}// if
 	}// argument
 
-	private void value() {
-		switch (lookAhead.tokenType) {
-		case BINARY:
-		case OCTAL:
+	private ExpressionNode value() {
+		// handle number conversion if needed
+		ExpressionNode expr = null;
+		TokenType tokenType = lookahead.tokenType;
+		switch (tokenType) {
 		case DECIMAL:
-		case HEX:
-			// argument -> number
-			nextToken();
+			if (lookahead.sequence.endsWith("D")) { // xxxxD
+				expr = new ConstantExpressionNode(TokenType.DECIMAL, lookahead.sequence);
+			} else { // xxxx no "D"
+				expr = new ConstantExpressionNode(lookahead.sequence);
+			}//
 			break;
+		case HEX:
+			expr = new ConstantExpressionNode(TokenType.HEX, lookahead.sequence);
+			break;
+		case OCTAL:
+			expr = new ConstantExpressionNode(TokenType.OCTAL, lookahead.sequence);
+			break;
+		case BINARY:
+			expr = new ConstantExpressionNode(TokenType.BINARY, lookahead.sequence);
+			break;
+		case STRING:
+			expr = new ConstantExpressionNode(TokenType.STRING, lookahead.sequence);
+			break;
+
 		case VARIABLE:
-			// argument -> VARIABLE
-			nextToken();
+			expr = new VariableExpressionNode(lookahead.sequence);
+			break;
 		default:
-			throw new ParserException("Unexpected symbol " + lookAhead.sequence + " found");
+			String errMessage = String.format("Unexpected Symbol %s found", lookahead.sequence);
+			throw new ParserException(errMessage);
 		}// switch
+		nextToken();
+		return expr;
+
+
 	}// value
 
 }// class Parser

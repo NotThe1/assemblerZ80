@@ -1,6 +1,7 @@
 package parser;
 
 public enum TokenType {
+			EPSILON,
 			FUNCTION,
 			OPEN_PARENTHESES,
 			CLOSE_PARENTHESES, 

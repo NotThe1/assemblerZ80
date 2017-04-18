@@ -73,18 +73,18 @@ public class Tokenizer {
 
 	}// class TokenInfo PARENTHeSIS
 	
-	private static final String PATTERN_FUNCTION = "sin|cos|exp|ln|sqrt";
+	private static final String PATTERN_FUNCTION = "(?i)sin|cos|exp|ln|sqrt";
 	private static final String PATTERN_OPEN_PARENTHESES = "\\(";
 	private static final String PATTERN_CLOSE_PARENTHESES = "\\)";
 	private static final String PATTERN_PLUS_MINUS = "[\\+|-]";
 	private static final String PATTERN_MULT_DIV = "[\\*|/]";
 	private static final String PATTERN_RAISED = "[\\^]";
-	private static final String PATTERN_HEX = "[0-9][0-9a-fA-F]{0,4}[H|h]";
-	private static final String PATTERN_OCTAL = "[0-7]+[Q|q|O|o]";
+	private static final String PATTERN_HEX = "(?i)[0-9][0-9A-F]{0,4}[H]";
+	private static final String PATTERN_OCTAL = "(?i)[0-7]+[Q|O]";
 	private static final String PATTERN_BINARY = "[0-1]+[B|b]";
 	private static final String PATTERN_DECIMAL = "[0-9]{1,4}[D|d]?+";
 	private static final String PATTERN_STRING = "('[^']*')|(\"[^\"]*\")";  // paired single or double quotes
-	private static final String PATTERN_LOGIC = "\\bAND\\b|\\bOR\\b";
+	private static final String PATTERN_LOGIC = "(?i)\\bAND\\b|\\bOR\\b";
 	private static final String PATTERN_VARIABLE = "^[\\?\\@\\w\\$][\\w\\$]{0,24}";
 	private static final String PATTERN_VARIABLE_$ = "\\s\\$\\s";
 

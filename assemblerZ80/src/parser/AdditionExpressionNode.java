@@ -12,8 +12,8 @@ public class AdditionExpressionNode extends SequenceExpressionNode {
 	}//Constructor - AdditionExpressionNode(ExpressionNode a, boolean positive)
 
 	@Override
-	public int getType() {
-		return ExpressionNode.ADDITION_NODE;
+	public NodeType getType() {
+		return NodeType.ADDITION;
 	}//getType
 
 	@Override

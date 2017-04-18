@@ -24,7 +24,7 @@ public abstract class SequenceExpressionNode implements ExpressionNode {
 		public ExpressionNode expression;
 		
 		public Term(boolean positive, ExpressionNode expression){
-			super();
+//			super();
 			this.positive= positive;
 			this.expression= expression;
 		}//Constructor - Term(boolean positive, ExpressionNode expression)

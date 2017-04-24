@@ -12,6 +12,8 @@ public class SourceLineAnalyzer {
 	private String lineNumberStr;
 	private String comment;
 	private String label;
+	private String instruction;
+	private String subOpCode;
 	private boolean lineAllComment;
 	private boolean activeLine;
 
@@ -48,11 +50,9 @@ public class SourceLineAnalyzer {
 			workingLine = findLineNumber(workingLine);
 			workingLine = findComment(workingLine);
 			workingLine = findLabel(workingLine);
-
+			workingLine = findInstruction( workingLine);
 		} // if
-
 		return activeLine;
-
 	}// analyze
 
 	private String findComment(String workingLine) {
@@ -131,16 +131,42 @@ public class SourceLineAnalyzer {
 		} // if
 		return netLine;
 	}// findLabel
-	
+
 	public boolean hasLabel() {
 		return label.length() > 0;
 	}// hasLabel
-	
+
 	public String getLabel() {
 		return label;
 	}// getLabel
 
+	public String findInstruction(String workingLine) {
+		String netLine = new String(workingLine).trim();
+		InstructionSet is = new InstructionSet();
+		Pattern patternForInstruction = Pattern.compile(InstructionSet.getRegex());
+		Matcher matcherForInstruction = patternForInstruction.matcher(netLine);
+		if (matcherForInstruction.lookingAt()) {
+			this.instruction = matcherForInstruction.group();
+			netLine = matcherForInstruction.replaceFirst(EMPTY_STRING);
+			this.subOpCode = is.getSubCode(this.instruction, netLine);
+		} else {
+			this.instruction = EMPTY_STRING;
+		}//if
+		return netLine;
+	}// findInstruction
+	
+	public boolean hasInstruction() {
+		return this.instruction.length() > 0;
+	}// hasLabel
 
+	public String getInstruction() {
+		return this.instruction;
+	}// getLabel
+	
+	public String getSubOpCode(){
+		return this.subOpCode;
+	}//getSubOpCode
+	
 	
 
 	private static final String COMMENT_CHAR = ";"; // semicolon ;

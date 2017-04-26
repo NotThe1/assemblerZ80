@@ -34,9 +34,17 @@ public class OpCodeNode implements Iterator<OpCodeNode>{
 		return this.pattern;
 	}//getPattern
 	
+//	public boolean hasPattern(){
+//		return this.pattern!=null;
+//	}//hasPattern
+	
 	public String getOpCodeVariation(){
 		return this.opCodeDetail;
 	}//getOpCodeVariation
+	
+	public boolean hasChildren(){
+		return this.opCodeNodes.size() > 0?true:false;
+	}//hasChildren
 
 	@Override
 	public boolean hasNext() {

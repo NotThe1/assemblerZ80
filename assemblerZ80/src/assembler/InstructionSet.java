@@ -6,43 +6,74 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class InstructionSet {
-	private static HashMap<String, OpCodeNode> instructions = new HashMap<String, OpCodeNode>();
+
+	private static InstructionSet instance = new InstructionSet();
+
+	private HashMap<String, OpCodeNode> instructions = new HashMap<String, OpCodeNode>();
 	private OpCodeNode root;
 	private OpCodeNode[] branch;
-	private static Matcher matcher;
+	private Matcher matcher;
+	private Pattern patternInstructions;
 
-	public InstructionSet() {
+	public static InstructionSet getInstance() {
+		return instance;
+	}// getInstance
+
+	private InstructionSet() {
 		appInit();
 	}// Constructor
 
-	public static boolean isValid(String opCode) {
+	public boolean isValid(String opCode) {
 		return instructions.containsKey(opCode);
 	}// isValid
 
-	public static String getSubCode(String key, String source) {
-		OpCodeNode root = instructions.get(key);
-		String opCodeVar = BAD_OPCODE;
-		String s = new String(source).trim();
-		OpCodeNode ocnArg1, ocnArg2;
-		while (root.hasNext()) {
-			ocnArg1 = root.next();
-			matcher = ocnArg1.getPattern().matcher(s);
-			if (matcher.lookingAt()) {
-				s = matcher.replaceFirst("").trim();
-				while (ocnArg1.hasNext()) {
-					ocnArg2 = ocnArg1.next();
-					matcher = ocnArg2.getPattern().matcher(s);
-					if (matcher.find()) {
-						opCodeVar = ocnArg2.getOpCodeVariation();
-						break;
-					} // if match Arg2
-				} // while arg1 has args
-			} // If matching arg 1
-		} // while root has arg
+	public Pattern getPatternInstructions() {
+		return this.patternInstructions;
+	}//getPatternInstructions
+
+	public String getSubCode(String source) {
+		String opCodeVar = null;
+		matcher = this.patternInstructions.matcher(source);
+		if (matcher.find()) {
+			opCodeVar = getSubCode(matcher.group(), source);
+		}
 		return opCodeVar;
 	}// getSubCode
 
-	public static String getRegex() {
+	public String getSubCode(String key, String source) {
+		String opCodeVar = null;
+		OpCodeNode root = instructions.get(key);
+		opCodeVar = getSubCode(root, source);
+
+		return opCodeVar;
+	}// getSubCode
+
+	private String getSubCode(OpCodeNode node, String source) {
+		String ans = null;
+
+		matcher = node.getPattern().matcher(source);
+
+		if (!matcher.find()) {
+			return ans;
+		} // if not interested in this node!
+
+		if (node.hasChildren()) {
+			node.resetIterator();
+			while (node.hasNext()) {
+				source = matcher.replaceFirst(EMPTY_STRING);
+				ans = getSubCode(node.next(), source.trim());
+				if (ans != null) {
+					break;
+				} // if - found it
+			} // while
+		} else { // no children - this is the one we want !!
+			ans = node.getOpCodeVariation();
+		} // inner if
+		return ans;
+
+	}// getSubCode
+
+	private String getRegex() {
 		StringBuilder sb = new StringBuilder("\\b(?i)(");
 		Set<String> operations = instructions.keySet();
 		for (String operation : operations) {
@@ -58,12 +89,19 @@ public class InstructionSet {
 
 	// -----------------------------------------------------------------
 	private void appInit() {
+
 		instructions.put("ADC", rootADC()); // A <- A + s + CY
-		instructions.put("ADD", rootADD()); // A <- A + s 
+		instructions.put("ADD", rootADD()); // A <- A + s
+		instructions.put("AND", rootAND()); // A ← A & s
+
+		instructions.put("CCF", rootCCF()); // CY <- CY
+
+		patternInstructions = Pattern.compile(getRegex());
+
 	}// appInit
 
 	private OpCodeNode rootADC() {
-		root = new OpCodeNode(null, BAD_OPCODE);
+		root = new OpCodeNode(patWord, BAD_OPCODE);
 
 		branch = new OpCodeNode[] { new OpCodeNode(patLIT_A, BAD_OPCODE), new OpCodeNode(patIND_XYd, "ADC_1"),
 				new OpCodeNode(patR8M, "ADC_2"), new OpCodeNode(patEXP, "ADC_3") };
@@ -76,7 +114,7 @@ public class InstructionSet {
 	}// rootADC
 
 	private OpCodeNode rootADD() {
-		root = new OpCodeNode(null, BAD_OPCODE);
+		root = new OpCodeNode(patWord, BAD_OPCODE);
 
 		branch = new OpCodeNode[] { new OpCodeNode(patLIT_A, BAD_OPCODE), new OpCodeNode(patIND_XYd, "ADD_1"),
 				new OpCodeNode(patR8M, "ADD_2"), new OpCodeNode(patEXP, "ADD_3") };
@@ -88,30 +126,36 @@ public class InstructionSet {
 		branch = new OpCodeNode[] { new OpCodeNode(patR16_XY, BAD_OPCODE), new OpCodeNode(patR16_IX, "ADD_5") };
 		root.addBranch(branch);
 		return root;
-	}
+	}// rootADD
 
-	private OpCodeNode rootMeta1() {
-		root = new OpCodeNode(null, BAD_OPCODE);
-
-		branch = new OpCodeNode[] { new OpCodeNode(patLIT_A, BAD_OPCODE), new OpCodeNode(patIND_XYd, "ADC_1"),
-				new OpCodeNode(patR8M, "ADC_2"), new OpCodeNode(patEXP, "ADC_3") };
+	private OpCodeNode rootAND() {
+		root = new OpCodeNode(patWord, BAD_OPCODE);
+		branch = new OpCodeNode[] { new OpCodeNode(patIND_XYd, "AND_1") };
 		root.addBranch(branch);
-
-		branch = new OpCodeNode[] { new OpCodeNode(patLIT_HL, BAD_OPCODE), new OpCodeNode(patR16_SP, "ADC_4") };
+		branch = new OpCodeNode[] { new OpCodeNode(patR8M, "AND_2") };
 		root.addBranch(branch);
+		branch = new OpCodeNode[] { new OpCodeNode(patEXP, "AND_3") };
+		root.addBranch(branch);
+		return root;
+	}// rootAND
 
+	private OpCodeNode rootCCF() {
+		root = new OpCodeNode(patWord, "CCF_0");
 		return root;
 	}
 
 	// ------------------------------------------------------------------------------------------
 	public static final String BAD_OPCODE = "Bad OpCode";
+	private static final String EMPTY_STRING = "";
 
-	public static final Pattern patLIT_A = Pattern.compile("A");
-	public static final Pattern patLIT_HL = Pattern.compile("HL");
-	public static final Pattern patIND_XYd = Pattern.compile("\\(I[X|Y]\\+");
-	public static final Pattern patR8M = Pattern.compile("(\\(HL\\))|(\\b[A|B|C|D|E|H|L|M]\\b)");
-	public static final Pattern patEXP = Pattern.compile(".");
-	public static final Pattern patR16_SP = Pattern.compile("BC|DE|HL|SP");
-	public static final Pattern patR16_XY = Pattern.compile("IX|IY");
-	public static final Pattern patR16_IX = Pattern.compile("BC|DE|SP|IX");
+	public final Pattern patLIT_A = Pattern.compile("A");
+	public final Pattern patLIT_HL = Pattern.compile("HL");
+	public final Pattern patIND_XYd = Pattern.compile("\\(I[X|Y]\\+");
+	public final Pattern patR8M = Pattern.compile("(\\(HL\\))|(\\b[A|B|C|D|E|H|L|M]\\b)");
+	public final Pattern patEXP = Pattern.compile(".");
+	public final Pattern patR16_SP = Pattern.compile("BC|DE|HL|SP");
+	public final Pattern patR16_XY = Pattern.compile("IX|IY");
+	public final Pattern patR16_IX = Pattern.compile("BC|DE|SP|IX");
+	public final Pattern patWord = Pattern.compile("\\b\\w*\\b");
+
 }// class InstructionSet

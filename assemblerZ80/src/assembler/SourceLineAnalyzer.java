@@ -142,13 +142,13 @@ public class SourceLineAnalyzer {
 
 	public String findInstruction(String workingLine) {
 		String netLine = new String(workingLine).trim();
-		InstructionSet is = new InstructionSet();
-		Pattern patternForInstruction = Pattern.compile(InstructionSet.getRegex());
+		InstructionSet is = InstructionSet.getInstance();
+		Pattern patternForInstruction = is.getPatternInstructions();
 		Matcher matcherForInstruction = patternForInstruction.matcher(netLine);
 		if (matcherForInstruction.lookingAt()) {
 			this.instruction = matcherForInstruction.group();
 			netLine = matcherForInstruction.replaceFirst(EMPTY_STRING);
-			this.subOpCode = is.getSubCode(this.instruction, netLine);
+			this.subOpCode = is.getSubCode(this.instruction, workingLine);
 		} else {
 			this.instruction = EMPTY_STRING;
 		}//if

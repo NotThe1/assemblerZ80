@@ -60,11 +60,17 @@ public class InstructionSet {
 		} // if not interested in this node!
 
 		if (node.hasChildren()) {
+			
+			source = matcher.replaceFirst(EMPTY_STRING);	// remove matched substring
+			source = source.replaceAll("\\s", EMPTY_STRING);//  remove all spaces
+		
+			
 			node.resetIterator();
+			
 			while (node.hasNext()) {
 				
-				source = matcher.replaceFirst(EMPTY_STRING);	// remove matched substring
-				source = source.replaceAll("\\s", EMPTY_STRING);//  remove all spaces
+//				source = matcher.replaceFirst(EMPTY_STRING);	// remove matched substring
+//				source = source.replaceAll("\\s", EMPTY_STRING);//  remove all spaces
 
 				ans = getSubCode(node.next(), source.trim());
 				if (ans != null) {
@@ -288,7 +294,7 @@ public class InstructionSet {
 				new OpCodeNode(patEXP, "LD_11")};
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_BCDE, BAD_OPCODE), new OpCodeNode(patLIT_A, "LD_12")};
+		branch = new OpCodeNode[] { new OpCodeNode(patIND_BCDE, "LD_12")};
 		root.addBranch(branch);
 		
 		branch = new OpCodeNode[] { new OpCodeNode(patIND_XYd1, BAD_OPCODE),
@@ -296,7 +302,7 @@ public class InstructionSet {
 				new OpCodeNode(patEXP, "LD_14")};
 		root.addBranch(branch);
 
-		branch = new OpCodeNode[] { new OpCodeNode(patR8_RI, BAD_OPCODE), new OpCodeNode(patLIT_A, "LD_15")};
+		branch = new OpCodeNode[] { new OpCodeNode(patR8_RI, "LD_15")};
 		root.addBranch(branch);
 		
 		branch = new OpCodeNode[] { new OpCodeNode(patR16_SP, BAD_OPCODE),
@@ -309,7 +315,7 @@ public class InstructionSet {
 				new OpCodeNode(patEXP, "LD_19")};
 		root.addBranch(branch);
 
-		branch = new OpCodeNode[] { new OpCodeNode(patR8, BAD_OPCODE),
+		branch = new OpCodeNode[] { new OpCodeNode(patR81, BAD_OPCODE),
 				new OpCodeNode(patR8M, "LD_20"),
 				new OpCodeNode(patIND_XYd, "LD_21"),
 				new OpCodeNode(patEXP, "LD_22")};
@@ -571,10 +577,11 @@ public class InstructionSet {
 	public static final String BAD_OPCODE = "Bad OpCode";
 	private static final String EMPTY_STRING = "";
 
-	public final Pattern patR8 = Pattern.compile("\\b[A,|B,|C,|D,|E,|H,|L,|A|B|C|D|E|H|L]\\b");
+	public final Pattern patR8 = Pattern.compile("[A|B|C|D|E|H|L],|[A|B|C|D|E|H|L]\\b");
+	public final Pattern patR81 = Pattern.compile("[A|B|C|D|E|H|L],");
 //	public final Pattern patR8M = Pattern.compile("(\\(HL\\))|(\\b[A|B|C|D|E|H|L|M]\\b)");
 	public final Pattern patR8M = Pattern.compile("\\(HL\\),|\\(HL\\)|[A|B|C|D|E|H|L|M],\\b|[A|B|C|D|E|H|L|M]\\b");
-	public final Pattern patR8_RI = Pattern.compile("R|I");
+	public final Pattern patR8_RI = Pattern.compile("R\\b|I\\b");
 
 	public final Pattern patR16_BCDE = Pattern.compile("BC|DE");
 	public final Pattern patR16_AF = Pattern.compile("BC|DE|HL|AF");
@@ -591,7 +598,7 @@ public class InstructionSet {
 
 	public final Pattern patIND_BCDE = Pattern.compile("\\(BC\\)|\\(DE\\)");
 	public final Pattern patIND_C = Pattern.compile("\\(C\\)");
-	public final Pattern patIND_HL = Pattern.compile("\\(HL\\)");
+	public final Pattern patIND_HL = Pattern.compile("\\(HL\\),|\\(HL\\)");
 	public final Pattern patIND_SP = Pattern.compile("\\(SP\\),");
 	public final Pattern patIND_XY = Pattern.compile("\\(X|Y\\)");
 	public final Pattern patIND_XYd = Pattern.compile("\\(I[X|Y]\\+.*\\)"); // last argument

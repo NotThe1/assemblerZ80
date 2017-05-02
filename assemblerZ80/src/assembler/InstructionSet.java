@@ -57,8 +57,8 @@ public class InstructionSet {
 		} // if not interested in this node!
 
 		if (node.hasChildren()) {
-			source = matcher.replaceFirst(EMPTY_STRING); // remove matched substring
-			source = source.replaceAll("\\s", EMPTY_STRING);// remove all spaces
+			source = matcher.replaceFirst(Z80.EMPTY_STRING); // remove matched substring
+			source = source.replaceAll("\\s", Z80.EMPTY_STRING);// remove all spaces
 			node.resetIterator();
 
 			while (node.hasNext()) {
@@ -156,189 +156,189 @@ public class InstructionSet {
 	}// addNoArgInstructions
 
 	private OpCodeNode rootNoArgs(String instruction) {
-		root = new OpCodeNode(patWord, instruction + "_0");
+		root = new OpCodeNode(Z80.patWord, instruction + "_0");
 		return root;
 	}// rootCCF
 
 	private OpCodeNode rootADC() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 
-		branch = new OpCodeNode[] { new OpCodeNode(patLIT_A, BAD_OPCODE),
-				 new OpCodeNode(patIND_XYd, "ADC_1"),
-				 new OpCodeNode(patR8M, "ADC_2"),
-				 new OpCodeNode(patEXP, "ADC_3") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patLIT_A, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patIND_XYd, "ADC_1"),
+				 new OpCodeNode(Z80.patR8M, "ADC_2"),
+				 new OpCodeNode(Z80.patEXP, "ADC_3") };
 		root.addBranch(branch);
 
-		branch = new OpCodeNode[] { new OpCodeNode(patLIT_HL, BAD_OPCODE),
-				new OpCodeNode(patR16_SP, "ADC_4") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patLIT_HL, Z80.BAD_OPCODE),
+				new OpCodeNode(Z80.patR16_SP, "ADC_4") };
 		root.addBranch(branch);
 		return root;
 	}// rootADC
 
 	private OpCodeNode rootADD() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 
-		branch = new OpCodeNode[] { new OpCodeNode(patLIT_A, BAD_OPCODE),
-				 new OpCodeNode(patIND_XYd, "ADD_1"),
-				 new OpCodeNode(patR8M, "ADD_2"),
-				 new OpCodeNode(patEXP, "ADD_3") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patLIT_A, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patIND_XYd, "ADD_1"),
+				 new OpCodeNode(Z80.patR8M, "ADD_2"),
+				 new OpCodeNode(Z80.patEXP, "ADD_3") };
 		root.addBranch(branch);
 
-		branch = new OpCodeNode[] { new OpCodeNode(patLIT_HL, BAD_OPCODE),
-				 new OpCodeNode(patR16_SP, "ADD_4") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patLIT_HL, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patR16_SP, "ADD_4") };
 		root.addBranch(branch);
 
-		branch = new OpCodeNode[] { new OpCodeNode(patR16_XY, BAD_OPCODE),
-				 new OpCodeNode(patR16_IX, "ADD_5") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR16_XY, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patR16_IX, "ADD_5") };
 		root.addBranch(branch);
 		return root;
 	}// rootADD
 
 	private OpCodeNode rootAND() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_XYd, "AND_1") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_XYd, "AND_1") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR8M, "AND_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR8M, "AND_2") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patEXP, "AND_3") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patEXP, "AND_3") };
 		root.addBranch(branch);
 		return root;
 	}// rootAND
 
 	private OpCodeNode rootBIT() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patEXP1, BAD_OPCODE),
-				 new OpCodeNode(patIND_XYd, "BIT_1"),
-				 new OpCodeNode(patR8M, "BIT_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patEXP1, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patIND_XYd, "BIT_1"),
+				 new OpCodeNode(Z80.patR8M, "BIT_2") };
 		root.addBranch(branch);
 		return root;
 	}// rootBIT
 
 	private OpCodeNode rootCALL() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patCOND, BAD_OPCODE),
-				 new OpCodeNode(patEXP, "CALL_1") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patCOND, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patEXP, "CALL_1") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patEXP, "CALL_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patEXP, "CALL_2") };
 		root.addBranch(branch);
 		return root;
 	}// rootCALL
 
 	private OpCodeNode rootCP() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_XYd, "CP_1") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_XYd, "CP_1") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR8M, "CP_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR8M, "CP_2") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patEXP, "CP_3") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patEXP, "CP_3") };
 		root.addBranch(branch);
 		return root;
 	}// rootCP
 
 	private OpCodeNode rootDEC() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_XYd, "DEC_1") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_XYd, "DEC_1") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR16_SP, "DEC_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR16_SP, "DEC_2") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR16_XY, "DEC_3") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR16_XY, "DEC_3") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR8M, "DEC_4") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR8M, "DEC_4") };
 		root.addBranch(branch);
 		return root;
 	}// rootDEC
 
 	private OpCodeNode rootDJNZ() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patEXP, "DJNZ_1") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patEXP, "DJNZ_1") };
 		root.addBranch(branch);
 		return root;
 	}// rootDJNZ
 
 	private OpCodeNode rootEX() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_SP, BAD_OPCODE),
-				 new OpCodeNode(patLIT_HL, "EX_1"),
-				 new OpCodeNode(patR16_XY, "EX_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_SP, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patLIT_HL, "EX_1"),
+				 new OpCodeNode(Z80.patR16_XY, "EX_2") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patLIT_AF, "EX_3") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patLIT_AF, "EX_3") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patLIT_DE, "EX_4") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patLIT_DE, "EX_4") };
 		root.addBranch(branch);
 
 		return root;
 	}// rootEX
 	
 	private OpCodeNode rootLD(){
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patLIT_A, BAD_OPCODE),
-				 new OpCodeNode(patIND_XYd, "LD_1"),
-				 new OpCodeNode(patIND_BCDE, "LD_2"),
-				 new OpCodeNode(patR8_RI, "LD_3"),
-				 new OpCodeNode(patR8M, "LD_4"),
-				 new OpCodeNode(patEXP_ADD, "LD_5"),
-				 new OpCodeNode(patEXP, "LD_6")};
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patLIT_A, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patIND_XYd, "LD_1"),
+				 new OpCodeNode(Z80.patIND_BCDE, "LD_2"),
+				 new OpCodeNode(Z80.patR8_RI, "LD_3"),
+				 new OpCodeNode(Z80.patR8M, "LD_4"),
+				 new OpCodeNode(Z80.patEXP_ADD, "LD_5"),
+				 new OpCodeNode(Z80.patEXP, "LD_6")};
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patLIT_HL, BAD_OPCODE),
-				 new OpCodeNode(patEXP_ADD, "LD_7")};
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patLIT_HL, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patEXP_ADD, "LD_7")};
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patLIT_SP, BAD_OPCODE),
-				 new OpCodeNode(patLIT_HL, "LD_8"),
-				 new OpCodeNode(patR16_XY, "LD_9"),
-				 new OpCodeNode(patEXP_ADD, "LD_10"),
-				 new OpCodeNode(patEXP, "LD_11")};
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patLIT_SP, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patLIT_HL, "LD_8"),
+				 new OpCodeNode(Z80.patR16_XY, "LD_9"),
+				 new OpCodeNode(Z80.patEXP_ADD, "LD_10"),
+				 new OpCodeNode(Z80.patEXP, "LD_11")};
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_BCDE, "LD_12")};
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_BCDE, "LD_12")};
 		root.addBranch(branch);	
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_XYd1, BAD_OPCODE),
-				 new OpCodeNode(patR8, "LD_13"),
-				 new OpCodeNode(patEXP, "LD_14")};
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_XYd1, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patR8, "LD_13"),
+				 new OpCodeNode(Z80.patEXP, "LD_14")};
 		root.addBranch(branch);
 
-		branch = new OpCodeNode[] { new OpCodeNode(patR8_RI, "LD_15")};
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR8_RI, "LD_15")};
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR16_SP, BAD_OPCODE),
-				 new OpCodeNode(patEXP_ADD, "LD_16"),
-				 new OpCodeNode(patEXP, "LD_17")};
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR16_SP, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patEXP_ADD, "LD_16"),
+				 new OpCodeNode(Z80.patEXP, "LD_17")};
 		root.addBranch(branch);
 
-		branch = new OpCodeNode[] { new OpCodeNode(patR16_XY, BAD_OPCODE),
-				 new OpCodeNode(patEXP_ADD, "LD_18"),
-				 new OpCodeNode(patEXP, "LD_19")};
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR16_XY, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patEXP_ADD, "LD_18"),
+				 new OpCodeNode(Z80.patEXP, "LD_19")};
 		root.addBranch(branch);
 
-		branch = new OpCodeNode[] { new OpCodeNode(patR81, BAD_OPCODE),
-				 new OpCodeNode(patR8M, "LD_20"),
-				 new OpCodeNode(patIND_XYd, "LD_21"),
-				 new OpCodeNode(patEXP, "LD_22")};
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR81, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patR8M, "LD_20"),
+				 new OpCodeNode(Z80.patIND_XYd, "LD_21"),
+				 new OpCodeNode(Z80.patEXP, "LD_22")};
 		root.addBranch(branch);
 
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_HL, BAD_OPCODE),
-				 new OpCodeNode(patR8M, "LD_23"),
-				 new OpCodeNode(patEXP, "LD_24")};
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_HL, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patR8M, "LD_23"),
+				 new OpCodeNode(Z80.patEXP, "LD_24")};
 		root.addBranch(branch);
 
 
@@ -347,67 +347,67 @@ public class InstructionSet {
 	}//
 
 	private OpCodeNode rootIM() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patEXP, "IM_1") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patEXP, "IM_1") };
 		root.addBranch(branch);
 		return root;
 	}// rootIM
 
 	private OpCodeNode rootIN() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patLIT_A, BAD_OPCODE),
-				 new OpCodeNode(patIND_C, "IN_1"),new OpCodeNode(patEXP_ADD, "IN_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patLIT_A, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patIND_C, "IN_1"),new OpCodeNode(Z80.patEXP_ADD, "IN_2") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR8, BAD_OPCODE),
-				 new OpCodeNode(patIND_C, "IN_3") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR8, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patIND_C, "IN_3") };
 		root.addBranch(branch);
 		return root;
 	}// rootIN
 
 	private OpCodeNode rootINC() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_XYd, "INC_1") };
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_XYd, "INC_1") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR16_SP, "INC_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR16_SP, "INC_2") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR16_XY, "INC_3") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR16_XY, "INC_3") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR8M, "INC_4") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR8M, "INC_4") };
 		root.addBranch(branch);
 		return root;
 	}// rootINC
 
 	private OpCodeNode rootJP() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
-		branch = new OpCodeNode[] { new OpCodeNode(patCOND, BAD_OPCODE),
-				 new OpCodeNode(patEXP, "JP_1") };
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patCOND, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patEXP, "JP_1") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_XY, "JP_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_XY, "JP_2") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_HL, "JP_3") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_HL, "JP_3") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patEXP, "JP_4") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patEXP, "JP_4") };
 		root.addBranch(branch);
 		return root;
 	}// rootJP
 
 	private OpCodeNode rootJR() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patCONDs, BAD_OPCODE),
-				 new OpCodeNode(patEXP, "JR_1") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patCONDs, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patEXP, "JR_1") };
 		root.addBranch(branch);
 
-		branch = new OpCodeNode[] { new OpCodeNode(patEXP, "JR_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patEXP, "JR_2") };
 		root.addBranch(branch);
 		return root;
 	}// rootJR
@@ -416,251 +416,213 @@ public class InstructionSet {
 	// ------------------------------------------------------------------------------------------
 
 	private OpCodeNode rootOR() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_XYd, "OR_1") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_XYd, "OR_1") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR8M, "OR_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR8M, "OR_2") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patEXP, "OR_3") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patEXP, "OR_3") };
 		root.addBranch(branch);
 		return root;
 	}// rootOR
 
 	private OpCodeNode rootOUT() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_C, "OUT_1") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_C, "OUT_1") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patEXP_ADD, "OUT_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patEXP_ADD, "OUT_2") };
 		root.addBranch(branch);
 		return root;
 	}// rootOUT
 
 	private OpCodeNode rootPOP() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR16_AF, "POP_1") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR16_AF, "POP_1") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR16_XY, "POP_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR16_XY, "POP_2") };
 		root.addBranch(branch);
 		return root;
 	}// rootPOP
 
 	private OpCodeNode rootPUSH() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR16_AF, "PUSH_1") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR16_AF, "PUSH_1") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR16_XY, "PUSH_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR16_XY, "PUSH_2") };
 		root.addBranch(branch);
 		return root;
 	}// rootPUSH
 
 	private OpCodeNode rootRES() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patEXP1, BAD_OPCODE),
-				 new OpCodeNode(patIND_XYd, "RES_1"),
-				 new OpCodeNode(patR8M, "RES_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patEXP1, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patIND_XYd, "RES_1"),
+				 new OpCodeNode(Z80.patR8M, "RES_2") };
 		root.addBranch(branch);
 		return root;
 	}// rootRES
 
 	private OpCodeNode rootRET() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patCOND, "RET_1") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patCOND, "RET_1") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patNothing, "RET_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patNothing, "RET_2") };
 		root.addBranch(branch);
 
 		return root;
 	}// rootRET
 
 	private OpCodeNode rootRL() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_XYd, "RL_1") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_XYd, "RL_1") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR8M, "RL_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR8M, "RL_2") };
 		root.addBranch(branch);
 		return root;
 	}// rootRL
 
 	private OpCodeNode rootRLC() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_XYd, "RLC_1") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_XYd, "RLC_1") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR8M, "RLC_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR8M, "RLC_2") };
 		root.addBranch(branch);
 		return root;
 	}// rootRLC
 
 	private OpCodeNode rootRR() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_XYd, "RR_1") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_XYd, "RR_1") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR8M, "RR_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR8M, "RR_2") };
 		root.addBranch(branch);
 		return root;
 	}// rootRR
 
 	private OpCodeNode rootRRC() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_XYd, "RRC_1") };		
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_XYd, "RRC_1") };		
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR8M, "RRC_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR8M, "RRC_2") };
 		root.addBranch(branch);
 		return root;
 	}// rootRRC
 
 	private OpCodeNode rootRST() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patEXP, "RST_1") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patEXP, "RST_1") };
 		root.addBranch(branch);
 		return root;
 	}// rootRST
 
 	private OpCodeNode rootSBC() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 
-		branch = new OpCodeNode[] { new OpCodeNode(patLIT_A, BAD_OPCODE),
-				 new OpCodeNode(patIND_XYd, "SBC_1"),
-				 new OpCodeNode(patR8M, "SBC_2"),
-				 new OpCodeNode(patEXP, "SBC_3") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patLIT_A, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patIND_XYd, "SBC_1"),
+				 new OpCodeNode(Z80.patR8M, "SBC_2"),
+				 new OpCodeNode(Z80.patEXP, "SBC_3") };
 		root.addBranch(branch);
 
-		branch = new OpCodeNode[] { new OpCodeNode(patLIT_HL, BAD_OPCODE),
-				 new OpCodeNode(patR16_SP, "SBC_4") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patLIT_HL, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patR16_SP, "SBC_4") };
 		root.addBranch(branch);
 
 		return root;
 	}// rootSBC
 
 	private OpCodeNode rootSET() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patEXP1, BAD_OPCODE),
-				 new OpCodeNode(patIND_XYd, "SET_1"),
-				 new OpCodeNode(patR8M, "SET_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patEXP1, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patIND_XYd, "SET_1"),
+				 new OpCodeNode(Z80.patR8M, "SET_2") };
 		root.addBranch(branch);
 
 		return root;
 	}// rootSET
 
 	private OpCodeNode rootSLA() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_XYd, "SLA_1") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_XYd, "SLA_1") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR8M, "SLA_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR8M, "SLA_2") };
 		root.addBranch(branch);
 		return root;
 	}// rootSLA
 
 	private OpCodeNode rootSRA() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_XYd, "SRA_1") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_XYd, "SRA_1") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR8M, "SRA_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR8M, "SRA_2") };
 		root.addBranch(branch);
 		return root;
 	}// rootSRA
 
 	private OpCodeNode rootSRL() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_XYd, "SRL_1") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_XYd, "SRL_1") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR8M, "SRL_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR8M, "SRL_2") };
 		root.addBranch(branch);
 		return root;
 	}// rootSRL
 
 	private OpCodeNode rootSUB() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_XYd, "SUB_1") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_XYd, "SUB_1") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR8M, "SUB_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR8M, "SUB_2") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patEXP, "SUB_3") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patEXP, "SUB_3") };
 		root.addBranch(branch);
 		return root;
 	}// rootSUB
 
 	private OpCodeNode rootXOR() {
-		root = new OpCodeNode(patWord, BAD_OPCODE);
+		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patIND_XYd, "XOR_1") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_XYd, "XOR_1") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patR8M, "XOR_2") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR8M, "XOR_2") };
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(patEXP, "XOR_3") };
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patEXP, "XOR_3") };
 		root.addBranch(branch);
 		return root;
 	}// rootXOR
 
-	// ------------------------------------------------------------------------------------------
-	public static final String BAD_OPCODE = "Bad OpCode";
-	private static final String EMPTY_STRING = "";
-
-	public final Pattern patR8 = Pattern.compile("[A|B|C|D|E|H|L],|[A|B|C|D|E|H|L]\\b");
-	public final Pattern patR81 = Pattern.compile("[A|B|C|D|E|H|L],");
-	public final Pattern patR8M = Pattern.compile("\\(HL\\),|\\(HL\\)|[A|B|C|D|E|H|L|M],\\b|[A|B|C|D|E|H|L|M]\\b");
-	public final Pattern patR8_RI = Pattern.compile("R\\b|I\\b");
-
-	public final Pattern patR16_BCDE = Pattern.compile("BC|DE");
-	public final Pattern patR16_AF = Pattern.compile("BC|DE|HL|AF");
-	public final Pattern patR16_SP = Pattern.compile("BC,|DE,|HL,|SP,|BC|DE|HL|SP");
-	public final Pattern patR16_XY = Pattern.compile("IX,|IY,|IX|IY");
-	public final Pattern patR16_IX = Pattern.compile("BC|DE|SP|IX");
-
-	public final Pattern patLIT_A = Pattern.compile("A,|A");
-	public final Pattern patLIT_AF = Pattern.compile("AF,");
-	public final Pattern patLIT_AFP = Pattern.compile("AF\\'");
-	public final Pattern patLIT_DE = Pattern.compile("DE");
-	public final Pattern patLIT_HL = Pattern.compile("HL,|HL");
-	public final Pattern patLIT_SP = Pattern.compile("SP,|SP");
-
-	public final Pattern patIND_BCDE = Pattern.compile("\\(BC\\)|\\(DE\\)");
-	public final Pattern patIND_C = Pattern.compile("\\(C\\)");
-	public final Pattern patIND_HL = Pattern.compile("\\(HL\\),|\\(HL\\)");
-	public final Pattern patIND_SP = Pattern.compile("\\(SP\\),");
-	public final Pattern patIND_XY = Pattern.compile("\\(X|Y\\)");
-	public final Pattern patIND_XYd = Pattern.compile("\\(I[X|Y]\\+.*\\)"); // last argument
-	public final Pattern patIND_XYd1 = Pattern.compile("\\(I[X|Y]\\+.*\\),"); // first of 2 arguments
-
-	public final Pattern patCOND = Pattern.compile("C,|M,|NC,|NZ,|P,|PE,|PO,|Z,|C|M|NC|NZ|P|PE|PO|Z");
-	public final Pattern patCONDs = Pattern.compile("C,|NC,|NZ,|Z,");	// some conditions
-
-	public final Pattern patEXP = Pattern.compile(".*");	// last argument
-	public final Pattern patEXP1 = Pattern.compile("[^,.]*,"); // first of 2 arguments
-	public final Pattern patEXP_ADD = Pattern.compile("\\(.*\\)");
-	public final Pattern patWord = Pattern.compile("\\b\\w*\\b");
-	public final Pattern patNothing = Pattern.compile("^");
 
 }// class InstructionSet

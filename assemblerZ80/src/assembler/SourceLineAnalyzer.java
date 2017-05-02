@@ -5,9 +5,6 @@ import java.util.regex.Pattern;
 
 public class SourceLineAnalyzer {
 
-	// private Pattern pattern;
-	// private Matcher matcher;
-
 	private String line;
 	private String lineNumberStr;
 	private String comment;

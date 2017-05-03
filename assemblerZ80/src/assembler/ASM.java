@@ -16,10 +16,16 @@ import java.awt.event.AdjustmentListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.print.PrinterException;
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.Date;
+import java.util.Scanner;
 import java.util.prefs.Preferences;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
@@ -39,82 +45,160 @@ import javax.swing.SwingConstants;
 import javax.swing.border.BevelBorder;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.SimpleAttributeSet;
+import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
 
 public class ASM {
-	
+
 	private AdapterForASM adapterForASM = new AdapterForASM();
-	
+	private InstructionCounter instructionCounter = InstructionCounter.getInstance();
+	private SymbolTable symbolTable = SymbolTable.getInstance();
+
 	private String defaultDirectory;
 	private String outputPathAndBase;
 	private File asmSourceFile = null;
 	private String sourceFileBase;
-	
+
 	private StyledDocument docSource;
 	private StyledDocument docListing;
 	private JScrollBar sbarSource;
 	private JScrollBar sbarListing;
-	
-	
+
 	private void start() {
-//		instructionCounter.reset();
-//		symbolTable.reset();
-//		if (asmSourceFile == null) {
-//			return; // do nothing
-//		}
-//		clearDoc(docSource);
-//		clearDoc(docListing);
-//
-//		loadSourceFile(asmSourceFile, 1, null);
-//		passOne(); // make symbol table & fix labels
-//		ByteBuffer memoryImage = passTwo();
-//
-//		if (rbListing.isSelected()) {
-//			saveListing();
-//		} // if listing
-//		if (rbMemFile.isSelected() || rbHexFile.isSelected()) {
-//			saveMemoryFile(memoryImage);
-//		} // if memory Image
-//		mnuFilePrintListing.setEnabled(true);
+		instructionCounter.reset();
+		symbolTable.reset();
+		if (asmSourceFile == null) {
+			return; // do nothing
+		}
+		clearDoc(docSource);
+		clearDoc(docListing);
+
+		loadSourceFile(asmSourceFile, 1, null);
+		passOne(); // make symbol table & fix labels
+		// ByteBuffer memoryImage = passTwo();
+		//
+		// if (rbListing.isSelected()) {
+		// saveListing();
+		// } // if listing
+		// if (rbMemFile.isSelected() || rbHexFile.isSelected()) {
+		// saveMemoryFile(memoryImage);
+		// } // if memory Image
+		// mnuFilePrintListing.setEnabled(true);
 
 	}// start
 
+	/**
+	 * passOne sets up the symbol table with initial value for Labels & symbols
+	 */
+	private void passOne() {
+		boolean emptyLine = true;
+		int lineNumber;
+		String sourceLine;
+		// LineParser lineParser = new LineParser();
+		SourceLineAnalyzer lineAnalyzer = new SourceLineAnalyzer();
+		Scanner scannerPassOne = new Scanner(tpSource.getText());
+		while (scannerPassOne.hasNextLine()) {
+			sourceLine = scannerPassOne.nextLine();
+			if (sourceLine.equals(EMPTY_STRING)) {
+				continue;
+			} // if skip textbox's empty lines
 
-	
+			if (!lineAnalyzer.analyze(sourceLine)) {
+				continue;
+			} // if skip textbox's empty lines
+
+			lineNumber = lineAnalyzer.getLineNumber();
+
+			if (lineAnalyzer.hasLabel()) {
+				processLabel(lineAnalyzer, lineNumber);
+			} // if - has label
+
+			if (lineAnalyzer.hasInstruction()) {
+				instructionCounter.incrementCurrentLocation(lineAnalyzer.getOpCodeSize());
+			} // if instruction
+
+//			 if (lineAnalyzer.hasDirective()) {
+//			 processDirectiveForLineCounter(lineAnalyzer, lineNumber);
+//			 }
+			// if (lineParser.hasName()) {
+			// processSymbol(lineParser, lineNumber);
+			// } // if has symbol
+			// // displayStuff(lineParser);
+		} // while
+
+		SymbolTable.passOneDone();
+		scannerPassOne.close();
+	}// passOne
+
+	private void processLabel(SourceLineAnalyzer sla, int lineNumber) {
+		String label = sla.getLabel().replace(":", EMPTY_STRING);
+		symbolTable.defineSymbol(label, instructionCounter.getCurrentLocation(), lineNumber, SymbolTable.LABEL);
+	}// processSymbol
+
 	private int loadSourceFile(File sourceFile, int lineNumber, SimpleAttributeSet attr) {
-//		try {
-//			FileReader source = new FileReader(sourceFile);
-//			BufferedReader reader = new BufferedReader(source);
-//			String line = null;
-//			String rawLine = null;
-//			String outputLine;
-//			Matcher matcherInclude;
-//			Pattern patternForInclude = Pattern.compile("\\$INCLUDE ", Pattern.CASE_INSENSITIVE);
-//			while ((rawLine = reader.readLine()) != null) {
-//				// // line = rawLine.toUpperCase();
-//				line = rawLine;
-//				// outputLine = String.format("%04d %s%n", lineNumber++, line);
-//				outputLine = String.format("%04d %s\n", lineNumber++, line);
-//
-//				insertSource(outputLine, attr);
-//				// txtSource.append(outputLine);
-//				matcherInclude = patternForInclude.matcher(line);
-//
-//				if (matcherInclude.find()) {
-//					String fileReference = line.substring(matcherInclude.end(), line.length());
-//					lineNumber = doInclude(fileReference, sourceFile.getParentFile().getAbsolutePath(), lineNumber);
-//				} // if
-//			} // while
-//			reader.close();
-//			mnuFilePrintSource.setEnabled(true);
-//			mnuFilePrintListing.setEnabled(false);
-//		} catch (IOException e) {
-//			e.printStackTrace();
-//		} // TRY
-//		return lineNumber;
-			return 0;
-	}// loadSourceFile	
+		try {
+			FileReader source = new FileReader(sourceFile);
+			BufferedReader reader = new BufferedReader(source);
+			String line = null;
+			String rawLine = null;
+			String outputLine;
+			Matcher matcherInclude;
+			Pattern patternForInclude = Pattern.compile("\\$INCLUDE ", Pattern.CASE_INSENSITIVE);
+			while ((rawLine = reader.readLine()) != null) {
+
+				line = rawLine;
+				// outputLine = String.format("%04d %s%n", lineNumber++, line);
+				outputLine = String.format("%04d %s\n", lineNumber++, line);
+
+				insertSource(outputLine, attr);
+				// txtSource.append(outputLine);
+				matcherInclude = patternForInclude.matcher(line);
+
+				if (matcherInclude.find()) {
+					String fileReference = line.substring(matcherInclude.end(), line.length());
+					lineNumber = doInclude(fileReference, sourceFile.getParentFile().getAbsolutePath(), lineNumber);
+				} // if
+			} // while
+			reader.close();
+			mnuFilePrintSource.setEnabled(true);
+			mnuFilePrintListing.setEnabled(false);
+		} catch (IOException e) {
+			e.printStackTrace();
+		} // TRY
+			// return lineNumber;
+		return 0;
+	}// loadSourceFile
+
+	public int doInclude(String fileReference, String parentDirectory, int lineNumber) {
+		if (!fileReference.contains("\\")) {
+			fileReference = parentDirectory + System.getProperty("file.separator") + fileReference;
+		} //
+
+		if (!(fileReference.toUpperCase().endsWith(SUFFIX_ASSEMBLER.toUpperCase()))) {
+			fileReference += "." + SUFFIX_ASSEMBLER;
+		} //
+
+		String includeMarker = ";<<<<<<<<<<<<<<<<<<<<<<< Include >>>>>>>>>>>>>>>>";
+		insertSource(String.format("%04d %s%n", lineNumber++, includeMarker), attrBlue);
+
+		File includedFile = new File(fileReference);
+		lineNumber = loadSourceFile(includedFile, lineNumber, attrBlue);
+
+		insertSource(String.format("%04d %s%n", lineNumber++, includeMarker), attrBlue);
+		//
+		return lineNumber;
+	}// doInclude
+
+	private void insertSource(String str, SimpleAttributeSet attr) {
+		try {
+			docSource.insertString(docSource.getLength(), str, attr);
+		} catch (BadLocationException e) {
+			e.printStackTrace();
+		} // try
+	}// insertSource
+
 	/* ---------------------------------------------------------------------------------- */
+
 	private void openFile() {
 		JFileChooser chooserOpen = MyFileChooser.getFilePicker(defaultDirectory, "Assembler Source Code",
 				SUFFIX_ASSEMBLER);
@@ -142,8 +226,8 @@ public class ASM {
 			tpSource.setCaretPosition(0);
 			btnStart.setEnabled(true);
 		} // if
-	}//openFile
-	
+	}// openFile
+
 	private void clearDoc(StyledDocument doc) {
 		try {
 			doc.remove(0, doc.getLength());
@@ -153,25 +237,24 @@ public class ASM {
 		} // try
 	}// clearDoc
 
-
-	
 	/* ---------------------------------------------------------------------------------- */
 
 	private void printListing(JTextPane textPane, String name) {
+		Font originalFont = textPane.getFont();
 		try {
-			textPane.setFont(new Font("Courier New", Font.PLAIN, 8));
+			// textPane.setFont(new Font("Courier New", Font.PLAIN, 8));
+			textPane.setFont(originalFont.deriveFont(8.0f));
 			MessageFormat header = new MessageFormat(name);
 			MessageFormat footer = new MessageFormat(new Date().toString() + "           Page - {0}");
 			textPane.print(header, footer);
-			textPane.setFont(new Font("Courier New", Font.PLAIN, 14));
-
+			// textPane.setFont(new Font("Courier New", Font.PLAIN, 14));
+			textPane.setFont(originalFont);
 		} catch (PrinterException e) {
 			e.printStackTrace();
 		} // try
 	}// printListing
 
 	/* ---------------------------------------------------------------------------------- */
-
 
 	/**
 	 * Launch the application.
@@ -184,10 +267,22 @@ public class ASM {
 					window.frmAsmAssembler.setVisible(true);
 				} catch (Exception e) {
 					e.printStackTrace();
-				}
-			}
+				} // try
+			}// run
 		});
-	}
+	}// main
+
+	private void setAttributes() {
+		StyleConstants.setForeground(attrNavy, new Color(0, 0, 128));
+		StyleConstants.setForeground(attrBlack, new Color(0, 0, 0));
+		StyleConstants.setForeground(attrBlue, new Color(0, 0, 255));
+		StyleConstants.setForeground(attrGreen, new Color(0, 128, 0));
+		StyleConstants.setForeground(attrTeal, new Color(0, 128, 128));
+		StyleConstants.setForeground(attrGray, new Color(128, 128, 128));
+		StyleConstants.setForeground(attrSilver, new Color(192, 192, 192));
+		StyleConstants.setForeground(attrRed, new Color(255, 0, 0));
+		StyleConstants.setForeground(attrMaroon, new Color(128, 0, 0));
+	}// setAttributes
 
 	private void appClose() {
 		Preferences myPrefs = Preferences.userNodeForPackage(ASM.class).node(this.getClass().getSimpleName());
@@ -220,27 +315,27 @@ public class ASM {
 		rbMemFile.setSelected(myPrefs.getBoolean("rbMemFile", true));
 		rbHexFile.setSelected(myPrefs.getBoolean("rbHexFile", true));
 		myPrefs = null;
-//
-//		// symbolTable = new SymbolTable(instructionCounter);
-//		docSource = tpSource.getStyledDocument();
-//		sbarSource = spSource.getVerticalScrollBar();
-//		sbarSource.setName(SBAR_SOURCE);
-//		sbarSource.addAdjustmentListener(adapterForASM);
-//
-//		docListing = tpListing.getStyledDocument();
-//		sbarListing = spListing.getVerticalScrollBar();
-//		sbarListing.setName(SBAR_LISTING);
-//		sbarListing.addAdjustmentListener(adapterForASM);
-//
-//		mnuFilePrintSource.setEnabled(false);
-//		mnuFilePrintListing.setEnabled(false);
-//
-//		setAttributes();
+
+		docSource = tpSource.getStyledDocument();
+		sbarSource = spSource.getVerticalScrollBar();
+		sbarSource.setName(SBAR_SOURCE);
+		sbarSource.addAdjustmentListener(adapterForASM);
+
+		docListing = tpListing.getStyledDocument();
+		sbarListing = spListing.getVerticalScrollBar();
+		sbarListing.setName(SBAR_LISTING);
+		sbarListing.addAdjustmentListener(adapterForASM);
+
+		mnuFilePrintSource.setEnabled(false);
+		mnuFilePrintListing.setEnabled(false);
+		//
+		setAttributes();
 	}// appInit
+
 	public ASM() {
 		initialize();
 		appInit();
-	}//constructor
+	}// constructor
 
 	/**
 	 * Initialize the contents of the frame.
@@ -447,6 +542,7 @@ public class ASM {
 		mnuFile.add(mnuFileExit);
 	}// initialize
 		// ---------------------------------------------------------------------
+
 	class AdapterForASM implements ActionListener, AdjustmentListener {
 
 		/* ActionListener */
@@ -541,11 +637,21 @@ public class ASM {
 	private static final String decimalValuePattern = "[0-9]{1,4}D?+";
 	private static final String stringValuePattern = "\\A'.*'\\z"; // used for
 
-//	private static final String r8r8Pattern = "[ABCDEHLM],[ABCDEHLM]";
-//	private static final String r16dPattern = "B|BC|D|DE|H|HL|SP";
-//	private static final String r8Pattern = "A|B|C|D|E|H|L|M";
+	// private static final String r8r8Pattern = "[ABCDEHLM],[ABCDEHLM]";
+	// private static final String r16dPattern = "B|BC|D|DE|H|HL|SP";
+	// private static final String r8Pattern = "A|B|C|D|E|H|L|M";
 
 	private static final int SIXTEEN = 16; // 0X10
+
+	private SimpleAttributeSet attrBlack = new SimpleAttributeSet();
+	private SimpleAttributeSet attrBlue = new SimpleAttributeSet();
+	private SimpleAttributeSet attrGray = new SimpleAttributeSet();
+	private SimpleAttributeSet attrGreen = new SimpleAttributeSet();
+	private SimpleAttributeSet attrRed = new SimpleAttributeSet();
+	private SimpleAttributeSet attrSilver = new SimpleAttributeSet();
+	private SimpleAttributeSet attrNavy = new SimpleAttributeSet();
+	private SimpleAttributeSet attrMaroon = new SimpleAttributeSet();
+	private SimpleAttributeSet attrTeal = new SimpleAttributeSet();
 
 	private JLabel lblSourceFilePath;
 	private JButton btnStart;
@@ -558,5 +664,4 @@ public class ASM {
 
 	// private static final String
 
-
-}//class ASM
+}// class ASM

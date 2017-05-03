@@ -5,16 +5,20 @@ import java.util.regex.Pattern;
 
 public class SourceLineAnalyzer {
 
-	private String line;
+	private String originalLine;
 	private String lineNumberStr;
 	private String comment;
 	private String label;
 	private String instruction;
+	private String directive;
+	private String name;
 	private String subOpCode;
 	private String argument1;
 	private String argument2;
 	private boolean lineAllComment;
 	private boolean activeLine;
+	
+	private int opCodeSize;
 
 	public SourceLineAnalyzer() {
 		appInit();
@@ -26,14 +30,19 @@ public class SourceLineAnalyzer {
 	}// appInit
 
 	public void clearAllVariables() {
-		this.line = EMPTY_STRING;
-		this.lineNumberStr = EMPTY_STRING;
-		this.comment = EMPTY_STRING;
-		this.label = EMPTY_STRING;
+		this.originalLine = null;
+		this.lineNumberStr = null;
+		this.comment = null;
+		this.label = null;
+		this.instruction= null;
+		this.directive = null;
+		this.name=null;
+		
 		;
 		this.activeLine = false;
 		this.argument1 = null;
 		this.argument2 = null;
+		this.opCodeSize = -1;
 
 	}// clearAllVariables
 
@@ -44,9 +53,9 @@ public class SourceLineAnalyzer {
 	public boolean analyze(String line) {
 		clearAllVariables();
 		activeLine = true;
-
-		this.line = line;
 		String workingLine = new String(line);
+		this.originalLine = new String(line);
+		
 		if (workingLine.trim().length() == 0) {
 			activeLine = false;
 			return activeLine;
@@ -67,11 +76,11 @@ public class SourceLineAnalyzer {
 			return activeLine; // done
 		} // if find args
 		
-//		if (workingLine.length() > 0) {
-//			workingLine = findDirective(workingLine);
-//		} // if
-//
-//		if (workingLine.length() > 0 & this.hasDirecive()) {
+		if (workingLine.length() > 0) {
+			workingLine = findDirective(workingLine);
+		} // if
+
+//		if (workingLine.length() > 0 & this.hasDirective()) {
 //			findArguments(workingLine);
 //			// done
 //		} // if get args
@@ -81,7 +90,7 @@ public class SourceLineAnalyzer {
 	}// analyze
 
 	private String findComment(String workingLine) {
-		this.comment = EMPTY_STRING;
+		this.comment = null;
 		this.lineAllComment = false;
 		String netLine = new String(workingLine);
 		if (!netLine.contains(";")) {
@@ -116,7 +125,7 @@ public class SourceLineAnalyzer {
 	}// isLineAllComment
 
 	public boolean hasComment() {
-		return (comment != EMPTY_STRING);
+		return comment != null;
 	}// hasComment
 
 	public String getComment() {
@@ -140,8 +149,12 @@ public class SourceLineAnalyzer {
 		return lineNumberStr.length() > 0;
 	}// hasLineNumber
 
-	public String getLineNumber() {
+	public String getLineNumberStr() {
 		return lineNumberStr;
+	}// getLineNumber
+
+	public int getLineNumber() {
+		return hasLineNumber() ? Integer.valueOf(this.lineNumberStr, 10) : -1;
 	}// getLineNumber
 
 	private String findLabel(String workingLine) {
@@ -152,17 +165,17 @@ public class SourceLineAnalyzer {
 			this.label = matcherForLabel.group();
 			netLine = matcherForLabel.replaceFirst(EMPTY_STRING);
 		} else {
-			this.label = EMPTY_STRING;
+			this.label = null;
 		} // if
 		return netLine.trim();
 	}// findLabel
 
 	public boolean hasLabel() {
-		return label.length() > 0;
+		return label != null;
 	}// hasLabel
 
 	public String getLabel() {
-		return label;
+		return hasLabel()?this.label:EMPTY_STRING;
 	}// getLabel
 
 	public String findInstruction(String workingLine) {
@@ -174,8 +187,9 @@ public class SourceLineAnalyzer {
 			this.instruction = matcherForInstruction.group();
 			netLine = matcherForInstruction.replaceFirst(EMPTY_STRING);
 			this.subOpCode = is.findSubCode(this.instruction, workingLine);
+			this.opCodeSize = SubInstructionSet.getOpCodeSize(subOpCode);
 		} else {
-			this.instruction = EMPTY_STRING;
+			this.instruction = null;
 		} // if
 		return netLine.trim();
 	}// findInstruction
@@ -185,12 +199,16 @@ public class SourceLineAnalyzer {
 	}// hasLabel
 
 	public String getInstruction() {
-		return this.instruction;
+		return hasInstruction()?this.instruction:EMPTY_STRING;
 	}// getLabel
 
 	public String getSubOpCode() {
 		return this.subOpCode;
 	}// getSubOpCode
+	
+	public int getOpCodeSize(){
+		return this.opCodeSize;
+	}//getOpCodeSize
 
 	private String findArguments(String workingLine) {
 		String source = workingLine.replaceAll("\\s", EMPTY_STRING);// remove all spaces
@@ -226,6 +244,52 @@ public class SourceLineAnalyzer {
 	public String getArgument2(){
 		return argument2;
 	}//getArgument2
+	
+	
+	/**
+	 * at this part of the line analysis there can be 4 possibilities:
+	 * 1 only a directive, 2 - a directive and  operand(s),
+	 *  3 - a name and directive or 4 - name, directive and operand(s)
+	 * @param workingLine
+	 * @return
+	 */
+	
+	private String findDirective(String workingLine) {
+		String netLine = new String(workingLine).trim();
+		this.directive = null;
+				
+		Pattern patternForDirectives = Pattern.compile(DirectiveSet.getRegex());
+		Matcher matcherForDirective = patternForDirectives.matcher(netLine);
+
+		if (matcherForDirective.find()) {	// there is a directive
+			if (matcherForDirective.start()!= 0){ // we have a name to process
+				String possibleName = netLine.substring(0, matcherForDirective.start());
+				Pattern patternForName = Pattern.compile("[\\@\\?A-Za-z]{1}\\w{1,25}\\s");
+				Matcher matcherForName = patternForName.matcher(possibleName);
+				this.name = matcherForName.lookingAt() ? possibleName.trim() : null;
+			}// if there is a name
+			this.directive = matcherForDirective.group();
+			netLine = netLine.substring(matcherForDirective.end());
+			
+		} // outer if
+		return netLine;
+	}// findDirective
+	
+	public boolean hasDirective(){
+		return this.directive !=null;
+	}//hasDirective
+	
+	public String getDirective(){
+		return hasDirective()?this.directive:EMPTY_STRING;
+	}//getDirective
+	
+	public boolean hasName(){
+		return this.name!= null;
+	}//hasName
+	
+	public String getName(){
+		return hasName()?this.name:EMPTY_STRING;
+	}//getName
 
 	private static final String COMMENT_CHAR = ";"; // semicolon ;
 	private static final String SINGLE_QUOTE = "'"; // single quote '

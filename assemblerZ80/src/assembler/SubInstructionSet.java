@@ -3,7 +3,7 @@ package assembler;
 import java.util.HashMap;
 
 public class SubInstructionSet {
-	private HashMap<String, SubInstruction> subInstructions = new HashMap<>();
+	private static HashMap<String, SubInstruction> subInstructions = new HashMap<>();
 
 	private static SubInstructionSet instance = new SubInstructionSet();
 
@@ -14,6 +14,11 @@ public class SubInstructionSet {
 	public static SubInstructionSet getInstance() {
 		return instance;
 	}// getInstance
+	
+	public static int getOpCodeSize(String subOpCode){
+		SubInstruction si = subInstructions.get(subOpCode);
+		return  si==null?-1:si.size;
+	}//getOpCodeSize
 
 	private void appInit() {
 
@@ -23,15 +28,15 @@ public class SubInstructionSet {
 		
 		baseCodes = new Byte[] { (byte) 0X80};
 		subInstructions.put("ADC_2",
-				new SubInstruction("ADC_1", 3, "A", Z80.patLIT_A, "IX", Z80.patR8M, baseCodes));
+				new SubInstruction("ADC_2", 1, "A", Z80.patLIT_A, "IX", Z80.patR8M, baseCodes));
 
 		 baseCodes = new Byte[] { (byte) 0XC6, (byte) 0X00};
 		subInstructions.put("ADC_3",
-				new SubInstruction("ADC_1", 3, "A", Z80.patLIT_A, "IX", Z80.patEXP, baseCodes));
+				new SubInstruction("ADC_3", 2, "A", Z80.patLIT_A, "IX", Z80.patEXP, baseCodes));
 		
 		 baseCodes = new Byte[] { (byte) 0XC6, (byte) 0X00};
 		subInstructions.put("ADC_4",
-				new SubInstruction("ADC_1", 3, "A", Z80.patLIT_HL, "SP", Z80.patR16_SP, baseCodes));
+				new SubInstruction("ADC_4", 2, "A", Z80.patLIT_HL, "SP", Z80.patR16_SP, baseCodes));
 		
 
 	}// appInit

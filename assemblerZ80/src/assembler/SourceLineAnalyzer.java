@@ -269,8 +269,8 @@ public class SourceLineAnalyzer {
 				this.name = matcherForName.lookingAt() ? possibleName.trim() : null;
 			}// if there is a name
 			this.directive = matcherForDirective.group();
-			netLine = netLine.substring(matcherForDirective.end());
-			
+//			netLine = netLine.substring(matcherForDirective.end());
+			this.argument1 = netLine.substring(matcherForDirective.end()).trim();
 		} // outer if
 		return netLine;
 	}// findDirective

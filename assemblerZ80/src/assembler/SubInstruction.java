@@ -6,14 +6,14 @@ public class SubInstruction {
 	public String name;
 	public String instruction;
 	public int size;
-	public Byte[] baseCodes;
+	public byte[] baseCodes;
 	public String argument1Type;
 	public Pattern pattern1;
 	public String argument2Type;
 	public Pattern pattern2;
 	
 	public SubInstruction(String name,int size,String argument1Type,Pattern pattern1,
-			String argument2Type,Pattern pattern2,Byte[] baseCodes){
+			String argument2Type,Pattern pattern2,byte[] baseCodes){
 		this.name=name;
 		this.size=size;
 		this.baseCodes = baseCodes;
@@ -28,12 +28,12 @@ public class SubInstruction {
 	
 	
 	
-	public SubInstruction(String name,int size,String argument1Type,Pattern pattern1,Byte[] baseCodes){
+	public SubInstruction(String name,int size,String argument1Type,Pattern pattern1,byte[] baseCodes){
 		this( name, size, argument1Type, pattern1,null, null, baseCodes);
 	}//Constructor
 
 
-	public SubInstruction(String name,int size,Byte[] baseCodes){
+	public SubInstruction(String name,int size,byte[] baseCodes){
 		this( name, size, null, null,null, null, baseCodes);
 	}//Constructor
 	

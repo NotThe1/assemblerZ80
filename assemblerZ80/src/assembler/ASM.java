@@ -20,8 +20,12 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.text.MessageFormat;
 import java.util.Date;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
 import java.util.Scanner;
 import java.util.prefs.Preferences;
 import java.util.regex.Matcher;
@@ -48,11 +52,24 @@ import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
 
+import parser.EvaluationException;
+import parser.ExpressionNode;
+import parser.Parser;
+import parser.ParserException;
+import parser.SetVariable;
+import parser.Token;
+import parser.TokenType;
+import parser.Tokenizer;
+
 public class ASM {
 
 	private AdapterForASM adapterForASM = new AdapterForASM();
 	private InstructionCounter instructionCounter = InstructionCounter.getInstance();
 	private SymbolTable symbolTable = SymbolTable.getInstance();
+	private Parser parser = new Parser();
+	private Tokenizer tokenizer = new Tokenizer();
+
+	private Queue<SourceLineParts> allLineParts;
 
 	private String defaultDirectory;
 	private String outputPathAndBase;
@@ -74,8 +91,10 @@ public class ASM {
 		clearDoc(docListing);
 
 		loadSourceFile(asmSourceFile, 1, null);
+		allLineParts = new LinkedList<SourceLineParts>();
+
 		passOne(); // make symbol table & fix labels
-		// ByteBuffer memoryImage = passTwo();
+		ByteBuffer memoryImage = passTwo();
 		//
 		// if (rbListing.isSelected()) {
 		// saveListing();
@@ -88,14 +107,254 @@ public class ASM {
 	}// start
 
 	/**
+	 * passTwo makes final pass at source, using symbol table to generate the object code
+	 */
+	private ByteBuffer passTwo() {
+		int hiAddress = ((((instructionCounter.getCurrentLocation() - 1) / SIXTEEN) + 1) * SIXTEEN) - 1;
+		ByteBuffer memoryImage = ByteBuffer.allocate(hiAddress + 1);
+
+		// System.out.printf("[passTwo] lowest location: %04X, highest Location: %04X%n",
+		// instructionCounter.getLowestLocationSet(), hiAddress);
+
+		instructionCounter.reset();
+		clearDoc(docListing);
+		int currentLocation;
+		String instructionImage;
+		SourceLineParts sourceLineParts;
+
+		while (!allLineParts.isEmpty()) {
+			instructionImage = EMPTY_STRING;
+
+			currentLocation = instructionCounter.getCurrentLocation();
+			sourceLineParts = allLineParts.poll();
+
+			if (sourceLineParts.hasInstruction()) {
+				instructionImage = setMemoryBytesForInstruction(sourceLineParts);
+			} else if (sourceLineParts.hasDirective()) {
+				instructionImage = setMemoryBytesForDirective(sourceLineParts);
+			} // if
+				// System.out.printf("[passTwo] %04d %04X %s%n", lineParser.getLineNumber(),
+				// currentLocation, instructionImage);
+			makeListing(currentLocation, instructionImage, sourceLineParts);
+			if (!instructionImage.equals(EMPTY_STRING)) {
+				buildMemoryImage(currentLocation, instructionImage, memoryImage);
+			} // if
+		} // while
+
+		tpListing.setCaretPosition(0);
+		makeXrefListing();
+		// makeMemoryFile(memoryImage);
+		return memoryImage;
+	}// passTwo
+
+	private String setMemoryBytesForInstruction(SourceLineParts sourceLineParts) {
+		String instructionStr = EMPTY_STRING;
+		switch (sourceLineParts.getArgumentCount()) {
+		case 0:
+			instructionStr = argCount0(sourceLineParts.getSubOpCode());
+			break;
+		case 1:
+			break;
+		case 2:
+			break;
+		default:
+
+		}// switch - getArgumentCount()
+		instructionCounter.incrementCurrentLocation(sourceLineParts.getOpCodeSize());
+
+		return instructionStr;
+	}// setMemoryBytesForInstruction
+
+	private String argCount0(String subOpCode) {
+		byte[] baseCodes = SubInstructionSet.getBaseCodes(subOpCode);
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < baseCodes.length; i++) {
+			sb.append(String.format("%02X ", baseCodes[i]));
+		} // for
+
+		return sb.toString().trim();
+	}// argCount0
+
+	private String argCount1() {
+		return null;
+	}// argCount1
+
+	private String argCount2() {
+		return null;
+	}// argCount2
+
+	private String setMemoryBytesForDirective(SourceLineParts sourceLineParts) {
+		switch (sourceLineParts.getDirective().toUpperCase()) {
+		case "DB":
+		case "DW":
+		case "DS":
+		case "ORG":
+			break;
+		default:
+			return EMPTY_STRING;
+		}// switch
+
+		if (!sourceLineParts.hasArguments()) {
+			String msg = String.format("%s on Line %04d needs an argument", sourceLineParts.getDirective(),
+					sourceLineParts.getLineNumber());
+			throw new AssemblerException(msg);
+		} // if - we have arguments
+
+		String args;
+		int ansInt;
+		StringBuilder sb = new StringBuilder();
+
+		int locationCount = 0;
+
+		Scanner scannerDirective = new Scanner(sourceLineParts.getArgument1());
+		scannerDirective.useDelimiter(COMMA);
+
+		switch (sourceLineParts.getDirective().toUpperCase()) {
+		case "DB":
+			byte aByte;
+			while (scannerDirective.hasNext()) {
+				args = scannerDirective.next();
+				if (args.matches(stringValuePattern)) { // literal
+					args = args.replace(QUOTE, EMPTY_STRING);
+					char[] allCharacters = args.toCharArray();
+					for (char aCharacter : allCharacters) {
+						aByte = (byte) aCharacter;
+						sb.append(String.format("%02X", aByte));
+						locationCount++;
+					} // for each
+				} else {
+					ansInt = resolveSimpleArgument(args, sourceLineParts.getLineNumber()) & 0XFF;
+					sb.append(String.format("%02X", ansInt));
+					locationCount++;
+				} // if
+			} // while
+			break;
+		case "DW":
+			while (scannerDirective.hasNext()) {
+				args = scannerDirective.next();
+				ansInt = resolveSimpleArgument(args, sourceLineParts.getLineNumber()) & 0XFFFF;
+				byte hiByte = (byte) (ansInt >> 8);
+				byte loByte = (byte) (ansInt & 0X00FF);
+				sb.append(String.format("%02X%02X", loByte, hiByte));
+				locationCount = 2;
+			} // while
+			break;
+		case "DS":
+			locationCount = resolveSimpleArgument(sourceLineParts.getArgument1(), sourceLineParts.getLineNumber())
+					& 0XFFFF;
+			break;
+		case "ORG":
+			Integer loc = resolveSimpleArgument(sourceLineParts.getArgument1(), sourceLineParts.getLineNumber());
+			if (loc != null) {
+				instructionCounter.setCurrentLocation(loc);
+				instructionCounter.setPriorLocation();
+				locationCount = 0;
+			} // if
+
+			break;
+		default:
+		}// switch
+		scannerDirective.close();
+		instructionCounter.incrementCurrentLocation(locationCount);
+		return sb.toString();
+	}// setMemoryBytesForDirective
+
+	private void buildMemoryImage(int pc, String lineImage, ByteBuffer memoryImage0) {
+		int numOfChars = lineImage.length() / 2;
+		if (numOfChars < 1) {
+			return;
+		} // if - nothing here
+		String strValue;
+		int intValue;
+		for (int i = 0; i < numOfChars; i++) {
+			strValue = lineImage.substring(i * 2, (i + 1) * 2);
+			intValue = Integer.valueOf(strValue.trim(), 16);
+			memoryImage0.put((Integer) pc + i, (byte) intValue);
+		}
+	}// saveMemoryImage
+
+	private void makeXrefListing() {
+		String stars = "************************";
+		insertListing(System.lineSeparator() + System.lineSeparator() + System.lineSeparator() + System.lineSeparator(),
+				null);
+		insertListing(String.format("           %s   %s   %s%n%n", stars, "Xref", stars), attrMaroon);
+
+		List<String> symbolList = symbolTable.getAllSymbols();
+
+		List<Integer> referenceList;
+		for (String symbol : symbolList) {
+			insertListing(String.format("%04d: ", symbolTable.getDefinedLineNumber(symbol)), attrSilver);
+			SimpleAttributeSet sab = symbolTable.getType(symbol) == SymbolTable.LABEL ? attrBlue : attrNavy;
+
+			insertListing(String.format("%-15s ", symbol), sab);
+			insertListing(String.format("%04X   ", symbolTable.getValue(symbol)), attrRed);
+
+			referenceList = symbolTable.getReferencedLineNumbers(symbol);
+			for (Integer reference : referenceList) {
+				insertListing(String.format("%04d ", reference), attrBlack);
+			} // for references
+
+			insertListing(System.lineSeparator(), null);
+		} // for
+
+	}// makeXrefListing ,symbolTable.getDefinedLineNumber(symbol)
+
+	private void makeListing(int location, String memoryImage, SourceLineParts sourceLineParts) {
+		String cmd;
+		SimpleAttributeSet attributeSet;
+		if (sourceLineParts.hasInstruction()) {
+			cmd = String.format("%-6s ", sourceLineParts.getInstruction());
+			attributeSet = attrNavy;
+		} else if (sourceLineParts.hasDirective()) {
+			cmd = String.format("%-6s ", sourceLineParts.getDirective());
+			attributeSet = attrBlue;
+		} else {
+			cmd = EMPTY_STRING;
+			attributeSet = null;
+		} // if
+
+		String symbol;
+		SimpleAttributeSet attributeSet1;
+		if (sourceLineParts.hasLabel()) {
+			symbol = String.format("%-10s ", sourceLineParts.getLabel());// + COLON
+			attributeSet1 = attrNavy;
+		} else if (sourceLineParts.hasName()) {
+			symbol = String.format("%-10s ", sourceLineParts.getName());
+			attributeSet1 = attrNavy;
+		} else {
+			symbol = String.format("%-10s ", EMPTY_STRING);
+			attributeSet1 = null;
+		} // if
+
+		String lineNumberStr = String.format("%04d: ", sourceLineParts.getLineNumber());
+		insertListing(lineNumberStr, attrSilver);
+		String memLocation = String.format("%04X ", location);
+		insertListing(memLocation, attrGray);
+		String image = String.format("%-8s", memoryImage);
+		insertListing(image, attrRed);
+
+		if (sourceLineParts.isLineAllComment()) {
+			insertListing(sourceLineParts.getComment(), attrGreen);
+		} else {
+			insertListing(symbol, attributeSet1);
+			insertListing(cmd, attributeSet);
+			String argument = String.format("%-20s ", sourceLineParts.getArgumentField());
+			insertListing(argument, attrBlack);
+			insertListing(sourceLineParts.getComment(), attrGreen);
+		} // if only comment
+
+		insertListing(System.lineSeparator(), null);
+	}// makeListing
+
+	/**
 	 * passOne sets up the symbol table with initial value for Labels & symbols
 	 */
 	private void passOne() {
-		boolean emptyLine = true;
 		int lineNumber;
 		String sourceLine;
 		// LineParser lineParser = new LineParser();
 		SourceLineAnalyzer lineAnalyzer = new SourceLineAnalyzer();
+		SourceLineParts sourceLineParts;
 		Scanner scannerPassOne = new Scanner(tpSource.getText());
 		while (scannerPassOne.hasNextLine()) {
 			sourceLine = scannerPassOne.nextLine();
@@ -103,37 +362,165 @@ public class ASM {
 				continue;
 			} // if skip textbox's empty lines
 
-			if (!lineAnalyzer.analyze(sourceLine)) {
+			sourceLineParts = lineAnalyzer.analyze(sourceLine);
+
+			if (!sourceLineParts.isLineActive()) {
 				continue;
 			} // if skip textbox's empty lines
 
-			lineNumber = lineAnalyzer.getLineNumber();
+			lineNumber = sourceLineParts.getLineNumber();
+			allLineParts.add(sourceLineParts);
 
-			if (lineAnalyzer.hasLabel()) {
-				processLabel(lineAnalyzer, lineNumber);
+			if (sourceLineParts.hasLabel()) {
+				processLabel(sourceLineParts, lineNumber);
 			} // if - has label
 
-			if (lineAnalyzer.hasInstruction()) {
-				instructionCounter.incrementCurrentLocation(lineAnalyzer.getOpCodeSize());
+			if (sourceLineParts.hasInstruction()) {
+				instructionCounter.incrementCurrentLocation(sourceLineParts.getOpCodeSize());
 			} // if instruction
 
-//			 if (lineAnalyzer.hasDirective()) {
-//			 processDirectiveForLineCounter(lineAnalyzer, lineNumber);
-//			 }
-			// if (lineParser.hasName()) {
-			// processSymbol(lineParser, lineNumber);
-			// } // if has symbol
-			// // displayStuff(lineParser);
-		} // while
+			if (sourceLineParts.hasDirective()) {
+				processDirectiveForLineCounter(sourceLineParts, lineNumber);
+			} // if directives
 
+			if (sourceLineParts.hasName()) {
+				processSymbol(sourceLineParts, lineNumber);
+			} // if has symbol
+
+			// displayStuff(lineParser);
+		} // while
 		SymbolTable.passOneDone();
 		scannerPassOne.close();
 	}// passOne
 
-	private void processLabel(SourceLineAnalyzer sla, int lineNumber) {
-		String label = sla.getLabel().replace(":", EMPTY_STRING);
+	private void processSymbol(SourceLineParts slp, int lineNumber) {
+		if (!slp.hasDirective()) {
+			return; // symbol definition needs to be on a directive line
+		} // if have a Directive?
+		String symbol = slp.getName();
+
+		switch (slp.getDirective().toUpperCase()) {
+		case "EQU":
+			int value = resolveSimpleArgument(slp.getArgument1(), lineNumber);
+			symbolTable.defineSymbol(symbol, value, lineNumber, SymbolTable.NAME);
+			break;
+		case "SET":
+		case "MACRO":
+		case "$INCLUDE":
+			// ok let it go
+			break;
+		default:
+			System.out.printf("** Check line number %d directive is = %s%n", lineNumber, slp.getDirective());
+			// look out for Include
+		}// switch
+
+	}// processSymbol
+
+	private void processLabel(SourceLineParts slp, int lineNumber) {
+		String label = slp.getLabel().replace(":", EMPTY_STRING);
 		symbolTable.defineSymbol(label, instructionCounter.getCurrentLocation(), lineNumber, SymbolTable.LABEL);
 	}// processSymbol
+
+	private void processDirectiveForLineCounter(SourceLineParts slp, int lineNumber) {
+		String directive = slp.getDirective();
+		String arguments = slp.getArgument1();
+		String errorMsg = String.format("Directive %s on line: %04d not yet implemented", directive, lineNumber);
+		Scanner scannerComma;
+		switch (directive.toUpperCase()) {
+		case "DB":
+			if (arguments != null) {
+				String arg;
+				scannerComma = new Scanner(arguments);
+				scannerComma.useDelimiter(COMMA);
+				while (scannerComma.hasNext()) {
+					arg = scannerComma.next();
+					if (arg.matches(stringValuePattern)) {
+						arg = arg.replace("'", "");
+						instructionCounter.incrementCurrentLocation(arg.length());
+					} else {
+						instructionCounter.incrementCurrentLocation();
+					} // if
+				} // while
+			} else {
+				throw new AssemblerException("Directive DB on line: " + lineNumber + " needs an argument");
+			} // if
+			break;
+		case "DW":
+			if (arguments != null) {
+				scannerComma = new Scanner(arguments);
+				scannerComma.useDelimiter(COMMA);
+				while (scannerComma.hasNext()) {
+					instructionCounter.incrementCurrentLocation(2);
+					scannerComma.next();
+				} // while
+			} else {
+				throw new AssemblerException("Directive DW on line: " + lineNumber + " needs an argument");
+			} // if
+			break;
+		case "DS":
+			int storage = resolveSimpleArgument(arguments, lineNumber);
+			instructionCounter.incrementCurrentLocation(storage);
+			break;
+		case "ORG":
+			Integer loc = resolveSimpleArgument(arguments, lineNumber);
+			if (loc != null) {
+				instructionCounter.setCurrentLocation(loc);
+				instructionCounter.setPriorLocation();
+			} // if
+			break;
+		case "ASEG":
+			if (arguments == null) {
+				instructionCounter.makeCurrent(InstructionCounter.ASEG);
+			} else {
+				instructionCounter.makeCurrent(InstructionCounter.ASEG, arguments);
+			} // if
+			break;
+		case "DSEG":
+			if (arguments == null) {
+				instructionCounter.makeCurrent(InstructionCounter.DSEG);
+			} else {
+				instructionCounter.makeCurrent(InstructionCounter.DSEG, arguments);
+			} // if
+			break;
+		case "CSEG":
+			if (arguments == null) {
+				instructionCounter.makeCurrent(InstructionCounter.CSEG);
+			} else {
+				instructionCounter.makeCurrent(InstructionCounter.CSEG, arguments);
+			} // if
+			break;
+		case "IF":
+			throw new AssemblerException(errorMsg);
+			// break;
+		case "ELSE":
+			throw new AssemblerException(errorMsg);
+			// break;
+		case "ENDIF":
+			throw new AssemblerException(errorMsg);
+			// break;
+		case "END":
+			// throw new AssemblerException(errorMsg);
+
+			break;
+		case "PUBLIC":
+			throw new AssemblerException(errorMsg);
+			// break;
+		case "EXTRN":
+			throw new AssemblerException(errorMsg);
+			// break;
+		case "NAME":
+			throw new AssemblerException(errorMsg);
+			// break;
+		case "STKLN":
+			throw new AssemblerException(errorMsg);
+			// break;
+		case "TITLE":
+			break;
+		default:
+			// ignore
+		}// switch directive
+
+	}// processDirectiveForLineCounter
 
 	private int loadSourceFile(File sourceFile, int lineNumber, SimpleAttributeSet attr) {
 		try {
@@ -166,10 +553,11 @@ public class ASM {
 			e.printStackTrace();
 		} // TRY
 			// return lineNumber;
-		return 0;
+		return lineNumber;
 	}// loadSourceFile
 
 	public int doInclude(String fileReference, String parentDirectory, int lineNumber) {
+
 		if (!fileReference.contains("\\")) {
 			fileReference = parentDirectory + System.getProperty("file.separator") + fileReference;
 		} //
@@ -192,6 +580,15 @@ public class ASM {
 	private void insertSource(String str, SimpleAttributeSet attr) {
 		try {
 			docSource.insertString(docSource.getLength(), str, attr);
+		} catch (BadLocationException e) {
+			e.printStackTrace();
+		} // try
+	}// insertSource
+
+	private void insertListing(String str, SimpleAttributeSet attr) {
+		try {
+			// docListing.
+			docListing.insertString(docListing.getLength(), str, attr);
 		} catch (BadLocationException e) {
 			e.printStackTrace();
 		} // try
@@ -253,6 +650,73 @@ public class ASM {
 			e.printStackTrace();
 		} // try
 	}// printListing
+
+	/* ---------------------------------------------------------------------------------- */
+	/* ---------------------------------------------------------------------------------- */
+
+	private Integer resolveSimpleArgument(String argument, Integer lineNumber) {
+		// Integer ans = null;
+		Integer ans = 0;
+		if (argument.equals("$")) {
+			ans = instructionCounter.getCurrentLocation();
+		} else if (symbolTable.contains(argument)) {
+			ans = symbolTable.getValue(argument);
+			symbolTable.referenceSymbol(argument, lineNumber);
+		} else if (argument.matches(stringValuePattern)) {
+			// ans = 0;
+			String s = argument.replace("'", ""); // remove the 's
+			byte[] ba = s.getBytes();
+			for (byte b : ba) {
+				ans = (ans << 8) + (b & 0XFF);
+			} //
+
+		} else if (argument.matches(hexValuePattern)) {
+			ans = Integer.valueOf(argument.replace("H", ""), 16);
+		} else if (argument.matches(octalValuePattern)) {
+			ans = Integer.valueOf(argument.substring(0, argument.length() - 1), 8);
+		} else if (argument.matches(decimalValuePattern)) {
+			ans = Integer.valueOf(argument.replace("D", ""), 10);
+		} else if (argument.matches(binaryValuePattern)) {
+			ans = Integer.valueOf(argument.replace("D", ""), 2);
+
+		} else {// send to expression resolver
+			ans = resolveExpression(argument, lineNumber);
+		}
+		if (ans == null) {
+			System.out.printf("Null ans from argument: %s%n", argument);
+		}
+
+		return (ans != null) ? ans & 0XFFFF : 0; // max value is 64K
+	}// resolveSimpleArgument
+
+	private Integer resolveExpression(String arguments, Integer lineNumber) {
+		Integer answer = null;
+		try {
+			tokenizer.tokenize(arguments);
+			ExpressionNode expression = parser.parse(tokenizer.getTokens());
+			LinkedList<Token> tokens = tokenizer.getTokens();
+
+			for (Token t : tokens) {
+				if (t.tokenType == TokenType.VARIABLE) {
+					int value = symbolTable.getValue(t.sequence);
+					symbolTable.referenceSymbol(t.sequence, lineNumber);
+
+					expression.accept(new SetVariable(t.sequence, value));
+				} // if - its a variable
+			}
+			answer = expression.getValue();
+		} catch (ParserException pe) {
+			System.err.println(pe.getMessage());
+			throw new AssemblerException("bad Expression: " + arguments);
+		} catch (EvaluationException ee) {
+			System.err.println(ee.getMessage());
+			throw new AssemblerException("bad Expression: " + arguments);
+		} // try
+		return answer;
+	}// resolveExpression
+
+	/* ---------------------------------------------------------------------------------- */
+	/* ---------------------------------------------------------------------------------- */
 
 	/* ---------------------------------------------------------------------------------- */
 

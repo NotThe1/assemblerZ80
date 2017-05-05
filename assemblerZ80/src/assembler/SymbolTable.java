@@ -23,6 +23,7 @@ public class SymbolTable {
 	private SymbolTable() {
 		symbols = new HashMap<String, SymbolTableEntry>();
 		symbols.put("$", new SymbolTableEntry("$", 0, 0, SymbolTable.ASSEMBLER));
+		instructionCounter = InstructionCounter.getInstance();
 		// pass1 = true;
 	}// SymbolTable
 

@@ -1,6 +1,7 @@
 package assembler;
 
 import java.util.HashMap;
+import java.util.regex.Pattern;
 
 public class SubInstructionSet {
 	private static HashMap<String, SubInstruction> subInstructions = new HashMap<>();
@@ -15,6 +16,10 @@ public class SubInstructionSet {
 		return instance;
 	}// getInstance
 	
+	public static SubInstruction getSubInstruction(String subOpCode){
+		return  subInstructions.get(subOpCode);
+	}//getOpCodeSize
+	
 	public static int getOpCodeSize(String subOpCode){
 		SubInstruction si = subInstructions.get(subOpCode);
 		return  si==null?-1:si.size;
@@ -24,6 +29,28 @@ public class SubInstructionSet {
 		SubInstruction si = subInstructions.get(subOpCode);
 		return  si==null?null:si.baseCodes;
 	}//getOpCodeSize
+	
+	public static Pattern getPattern1(String subOpCode){
+		SubInstruction si = subInstructions.get(subOpCode);
+		return  si==null?null:si.pattern1;
+	}//getPattern1
+	
+	public static String getArgType1(String subOpCode){
+		SubInstruction si = subInstructions.get(subOpCode);
+		return  si==null?null:si.argument1Type;
+	}//getArgType1
+	
+	public static Pattern getPattern2(String subOpCode){
+		SubInstruction si = subInstructions.get(subOpCode);
+		return  si==null?null:si.pattern2;
+	}//getPattern2
+	
+	public static String getArgType2(String subOpCode){
+		SubInstruction si = subInstructions.get(subOpCode);
+		return  si==null?null:si.argument2Type;
+	}//getArgType2
+	
+	
 
 	private void appInit() {
 		// Zero Arguments ...................................................
@@ -135,9 +162,57 @@ public class SubInstructionSet {
 		baseCodes = new byte[] {  (byte) 0X37};
 		subInstructions.put("SCF_0",new SubInstruction("SCF_0", 1,baseCodes));
 
+		// Zero and One Argument
 		
-		
+		baseCodes = new byte[] {  (byte) 0XC9};
+		subInstructions.put("RET_2",new SubInstruction("RET_2", 1,baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XC0};
+		subInstructions.put("RET_1",new SubInstruction("RET_1", 1,Z80.COND,Z80.patCOND,baseCodes));
+			
 		// One Argument ...................................................
+		
+		baseCodes = new byte[] { (byte) 0XED,(byte) 0X46};
+		subInstructions.put("IM_1",new SubInstruction("IM_1", 2,Z80.EXP_IM,Z80.patEXP_IM,baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XC7};
+		subInstructions.put("RST_1",new SubInstruction("RST_1", 1,Z80.EXP_RST,Z80.patEXP,baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XE6,(byte) 0X00};
+		subInstructions.put("AND_3",new SubInstruction("AND_3", 2,Z80.EXP_DB,Z80.patEXP,baseCodes));
+
+
+		baseCodes = new byte[] { (byte) 0XFE,(byte) 0X00};
+		subInstructions.put("CP_3",new SubInstruction("CP_3", 2,Z80.EXP_DB,Z80.patEXP,baseCodes));
+
+
+		baseCodes = new byte[] { (byte) 0X10,(byte) 0X00};
+		subInstructions.put("DJNZ_1",new SubInstruction("DJNZ_1", 2,Z80.EXP_DB,Z80.patEXP,baseCodes));
+
+
+		baseCodes = new byte[] { (byte) 0X18,(byte) 0X00};
+		subInstructions.put("JR_2",new SubInstruction("JR_2", 2,Z80.EXP_DB,Z80.patEXP,baseCodes));
+
+
+		baseCodes = new byte[] { (byte) 0XF6,(byte) 0X00};
+		subInstructions.put("OR_3",new SubInstruction("OR_3", 2,Z80.EXP_DB,Z80.patEXP,baseCodes));
+
+
+		baseCodes = new byte[] { (byte) 0XD6,(byte) 0X00};
+		subInstructions.put("SUB_3",new SubInstruction("SUB_3", 2,Z80.EXP_DB,Z80.patEXP,baseCodes));
+
+
+		baseCodes = new byte[] { (byte) 0XEE,(byte) 0X00};
+		subInstructions.put("XOR_3",new SubInstruction("XOR_3", 2,Z80.EXP_DB,Z80.patEXP,baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XCD,(byte) 0X00,(byte) 0X00};
+		subInstructions.put("CALL_2",new SubInstruction("CALL_2", 3,Z80.EXP_DW,Z80.patEXP,baseCodes));
+
+		baseCodes = new byte[] { (byte) 0Xc3,(byte) 0X00,(byte) 0X00};
+		subInstructions.put("JP_4",new SubInstruction("JP_4", 3,Z80.EXP_DW,Z80.patEXP,baseCodes));
+
+
+		
 		// Two Arguments ...................................................
 
 		baseCodes = new byte[] { (byte) 0XDD, (byte) 0X86, (byte) 0X00 };

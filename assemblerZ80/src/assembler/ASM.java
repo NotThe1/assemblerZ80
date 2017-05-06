@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.text.MessageFormat;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
@@ -70,6 +71,7 @@ public class ASM {
 	private Tokenizer tokenizer = new Tokenizer();
 
 	private Queue<SourceLineParts> allLineParts;
+	private HashMap<String, Byte> conditionTable;
 
 	private String defaultDirectory;
 	private String outputPathAndBase;
@@ -149,11 +151,13 @@ public class ASM {
 
 	private String setMemoryBytesForInstruction(SourceLineParts sourceLineParts) {
 		String instructionStr = EMPTY_STRING;
+		byte[] netCodes = null;
 		switch (sourceLineParts.getArgumentCount()) {
 		case 0:
-			instructionStr = argCount0(sourceLineParts.getSubOpCode());
+			netCodes = argCount0(sourceLineParts);
 			break;
 		case 1:
+			netCodes = argCount1(sourceLineParts);
 			break;
 		case 2:
 			break;
@@ -162,26 +166,85 @@ public class ASM {
 		}// switch - getArgumentCount()
 		instructionCounter.incrementCurrentLocation(sourceLineParts.getOpCodeSize());
 
-		return instructionStr;
+		return getInstructionCode(netCodes);
 	}// setMemoryBytesForInstruction
 
-	private String argCount0(String subOpCode) {
-		byte[] baseCodes = SubInstructionSet.getBaseCodes(subOpCode);
+	private String getInstructionCode(byte[] baseCodes) {
 		StringBuilder sb = new StringBuilder();
 		for (int i = 0; i < baseCodes.length; i++) {
 			sb.append(String.format("%02X ", baseCodes[i]));
 		} // for
-
 		return sb.toString().trim();
+	}
+
+	private byte[] argCount0(SourceLineParts sourceLineParts) {
+		String subOpCode = sourceLineParts.getSubOpCode();
+		return SubInstructionSet.getBaseCodes(subOpCode);
 	}// argCount0
 
-	private String argCount1() {
-		return null;
+	private byte[] argCount1(SourceLineParts sourceLineParts) {
+		String subOpCode = sourceLineParts.getSubOpCode();
+		SubInstruction si = SubInstructionSet.getSubInstruction(subOpCode);
+		byte ans[] = si.baseCodes.clone();
+		Pattern pattern = si.pattern1;
+		String argType = si.argument1Type;
+		String argument = sourceLineParts.getArgument1();
+		switch (si.argument1Type) {
+		case Z80.COND:
+			byte c = Z80.conditionTable.get(argument);
+			ans[0] = (byte) (ans[0] | c);
+			break;
+		case Z80.EXP_IM:
+			Matcher m = pattern.matcher(argument);
+			if (!m.matches()) {
+				String msg = String.format("%s on Line %04d is an invalid argument", argument,
+						sourceLineParts.getLineNumber());
+				reportError(msg);
+				break;
+			} // if
+
+			if (argument.equals("0")) {
+				ans[1] = (byte) 0X46;
+			} else if (argument.equals("1")) {
+				ans[1] = (byte) 0X56;
+			} else if (argument.equals("2")) {
+				ans[1] = (byte) 0X5E;
+			} // if
+			break;
+		case Z80.EXP_RST:
+			int value = resolveExpression(argument, sourceLineParts.getLineNumber());
+			if ((value > 56) | (value % 8 != 0)) {
+				String msg = String.format("%s on Line %04d is an invalid argument", argument,
+						sourceLineParts.getLineNumber());
+				reportError(msg);
+				break;
+			} // if
+			ans[0] = (byte) (ans[0] | (byte) value);
+			break;
+		case Z80.EXP_DB:
+			value = resolveExpression(argument, sourceLineParts.getLineNumber());
+			ans[1] = (byte) (ans[1] | (byte) value);
+
+			break;
+		case Z80.EXP_DW:
+			value = resolveExpression(argument, sourceLineParts.getLineNumber());
+			value = value & 0XFFFF; // limit to 64K
+			byte hiByte = (byte) ((value >> 8) & 0XFF);
+			byte loByte = (byte) (value & 0XFF);
+			ans[1] = loByte;
+			ans[2] = hiByte;
+
+			break;
+		default:
+		}// switch - arg type
+		return ans;
 	}// argCount1
 
 	private String argCount2() {
 		return null;
 	}// argCount2
+
+	// -----------------------------------------------
 
 	private String setMemoryBytesForDirective(SourceLineParts sourceLineParts) {
 		switch (sourceLineParts.getDirective().toUpperCase()) {
@@ -195,9 +258,9 @@ public class ASM {
 		}// switch
 
 		if (!sourceLineParts.hasArguments()) {
-			String msg = String.format("%s on Line %04d needs an argument", sourceLineParts.getDirective(),
+			String msg = String.format("%s on Line %04d is an invalid argument", sourceLineParts.getDirective(),
 					sourceLineParts.getLineNumber());
-			throw new AssemblerException(msg);
+			reportError(msg);
 		} // if - we have arguments
 
 		String args;
@@ -442,7 +505,10 @@ public class ASM {
 					} // if
 				} // while
 			} else {
-				throw new AssemblerException("Directive DB on line: " + lineNumber + " needs an argument");
+				String msg = String.format("Directive %s on line: %04d needs an argument", slp.getDirective(),
+						lineNumber);
+				reportError(msg);
+				break;
 			} // if
 			break;
 		case "DW":
@@ -454,7 +520,10 @@ public class ASM {
 					scannerComma.next();
 				} // while
 			} else {
-				throw new AssemblerException("Directive DW on line: " + lineNumber + " needs an argument");
+				String msg = String.format("Directive %s on line: %04d needs an argument", slp.getDirective(),
+						lineNumber);
+				reportError(msg);
+				break;
 			} // if
 			break;
 		case "DS":
@@ -489,32 +558,18 @@ public class ASM {
 				instructionCounter.makeCurrent(InstructionCounter.CSEG, arguments);
 			} // if
 			break;
-		case "IF":
-			throw new AssemblerException(errorMsg);
-			// break;
-		case "ELSE":
-			throw new AssemblerException(errorMsg);
-			// break;
-		case "ENDIF":
-			throw new AssemblerException(errorMsg);
-			// break;
 		case "END":
 			// throw new AssemblerException(errorMsg);
-
 			break;
+		case "IF":
+		case "ELSE":
+		case "ENDIF":
 		case "PUBLIC":
-			throw new AssemblerException(errorMsg);
-			// break;
 		case "EXTRN":
-			throw new AssemblerException(errorMsg);
-			// break;
 		case "NAME":
-			throw new AssemblerException(errorMsg);
-			// break;
 		case "STKLN":
-			throw new AssemblerException(errorMsg);
-			// break;
 		case "TITLE":
+			reportError(errorMsg);
 			break;
 		default:
 			// ignore
@@ -706,11 +761,12 @@ public class ASM {
 			}
 			answer = expression.getValue();
 		} catch (ParserException pe) {
-			System.err.println(pe.getMessage());
-			throw new AssemblerException("bad Expression: " + arguments);
+			//System.err.println(pe.getMessage());
+			String msg = String.format(" Line %04d has a  bad argument: %s",lineNumber,arguments);
+			reportError(msg);
 		} catch (EvaluationException ee) {
-			System.err.println(ee.getMessage());
-			throw new AssemblerException("bad Expression: " + arguments);
+			String msg = String.format(" Line %04d has a  bad argument: %s",lineNumber,arguments);
+			reportError(msg);
 		} // try
 		return answer;
 	}// resolveExpression
@@ -735,6 +791,12 @@ public class ASM {
 			}// run
 		});
 	}// main
+
+	private void reportError(String messsage) {
+		insertListing("*************" + System.lineSeparator(), attrRed);
+		insertListing(messsage + System.lineSeparator(), attrRed);
+		insertListing("*************" + System.lineSeparator(), attrRed);
+	}
 
 	private void setAttributes() {
 		StyleConstants.setForeground(attrNavy, new Color(0, 0, 128));

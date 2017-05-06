@@ -1,10 +1,18 @@
 package assembler;
 
+import java.util.HashMap;
 import java.util.regex.Pattern;
 
 public final class Z80 {
 	public static final String BAD_OPCODE = "Bad OpCode";
 	public static final String EMPTY_STRING = "";
+	
+	public static final String COND = "COND";
+	public static final String EXP_DB = "EXP_DB";
+	public static final String EXP_DW = "EXP_DW";
+	public static final String EXP_IM = "EXP_IM";		// used for IM -> 0,1,2
+	public static final String EXP_RST = "EXP_RST";		// used for RST -> 0H,8H,10H,18H,20H,28H,30H,38H
+
 
 	public static final Pattern patR8 = Pattern.compile("[A|B|C|D|E|H|L],|[A|B|C|D|E|H|L]\\b");
 	public static final Pattern patR81 = Pattern.compile("[A|B|C|D|E|H|L],");
@@ -40,6 +48,21 @@ public final class Z80 {
 	public static final Pattern patEXP_ADD = Pattern.compile("\\(.*\\)");
 	public static final Pattern patWord = Pattern.compile("\\b\\w*\\b");
 	public static final Pattern patNothing = Pattern.compile("^");
+	
+	public static final Pattern patEXP_IM = Pattern.compile("0|1|2");
+	
+	
+	public static final HashMap<String,Byte> conditionTable = new HashMap<>();
+	static{
+		conditionTable.put("NZ",(byte) 0b00000000);
+		conditionTable.put("Z", (byte) 0b00001000);
+		conditionTable.put("NC",(byte) 0b00010000);
+		conditionTable.put("C", (byte) 0b00011000);
+		conditionTable.put("PO",(byte) 0b00100000);
+		conditionTable.put("PE",(byte) 0b00101000);
+		conditionTable.put("P", (byte) 0b00110000);
+		conditionTable.put("M", (byte) 0b00111000);
+	}//static
 	
 	public Z80(){
 		

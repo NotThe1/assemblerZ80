@@ -6,7 +6,6 @@ Value55AA	EQU	055AAH
 		ORG      0100H
 Start:
 
-		IM       011h
 		
 		CALL	1234H		; CD lo hi
 		CALL	$		; CD lo hi
@@ -82,6 +81,6 @@ Start:
 		RRCA			; 0F
 		RRD 			; ED 67
 		SCF				; 37
-Finis:
+finish:
 		
 

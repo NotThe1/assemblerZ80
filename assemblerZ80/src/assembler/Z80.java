@@ -8,10 +8,12 @@ public final class Z80 {
 	public static final String EMPTY_STRING = "";
 	
 	public static final String COND = "COND";
+	public static final String COND_LIMITED = "COND_LIMITED";
 	public static final String EXP_DB = "EXP_DB";
 	public static final String EXP_DW = "EXP_DW";
 	public static final String EXP_IM = "EXP_IM";		// used for IM -> 0,1,2
 	public static final String EXP_RST = "EXP_RST";		// used for RST -> 0H,8H,10H,18H,20H,28H,30H,38H
+	public static final String EXP_ADDR = "EXP_ADDR";		// used for RST -> 0H,8H,10H,18H,20H,28H,30H,38H
 
 
 	public static final Pattern patR8 = Pattern.compile("[A|B|C|D|E|H|L],|[A|B|C|D|E|H|L]\\b");

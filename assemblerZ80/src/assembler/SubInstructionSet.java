@@ -231,6 +231,24 @@ public class SubInstructionSet {
 		subInstructions.put("ADC_4",
 				new SubInstruction("ADC_4", 2, "A", Z80.patLIT_HL, "SP", Z80.patR16_SP, baseCodes));
 		
+		baseCodes = new byte[] { (byte) 0XC4, (byte) 0X00, (byte) 0X00 };
+		subInstructions.put("CALL_1",
+				new SubInstruction("CALL_1", 3, Z80.COND, Z80.patCOND, Z80.EXP_DW, Z80.patEXP, baseCodes));
+		
+		baseCodes = new byte[] { (byte) 0XC2, (byte) 0X00, (byte) 0X00 };
+		subInstructions.put("JP_1",
+				new SubInstruction("JP_1", 3, Z80.COND, Z80.patCOND, Z80.EXP_DW, Z80.patEXP, baseCodes));
+		
+		baseCodes = new byte[] { (byte) 0X20, (byte) 0X00 };
+		subInstructions.put("JR_1",
+				new SubInstruction("JR_1", 2, Z80.COND_LIMITED, Z80.patCONDs, Z80.EXP_DB, Z80.patEXP, baseCodes));
+		
+		baseCodes = new byte[] { (byte) 0XD3, (byte) 0X00 };
+		subInstructions.put("OUT_2",
+				new SubInstruction("OUT_2", 2, Z80.EXP_ADDR, Z80.patEXP_ADD, "A", Z80.patLIT_A, baseCodes));
+		
+
+		
 
 	}// appInit
 

@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.text.MessageFormat;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
@@ -71,7 +70,7 @@ public class ASM {
 	private Tokenizer tokenizer = new Tokenizer();
 
 	private Queue<SourceLineParts> allLineParts;
-	private HashMap<String, Byte> conditionTable;
+	// private HashMap<String, Byte> conditionTable;
 
 	private String defaultDirectory;
 	private String outputPathAndBase;
@@ -150,7 +149,9 @@ public class ASM {
 	}// passTwo
 
 	private String setMemoryBytesForInstruction(SourceLineParts sourceLineParts) {
-		String instructionStr = EMPTY_STRING;
+		// String instructionStr = EMPTY_STRING;
+		instructionCounter.incrementCurrentLocation(sourceLineParts.getOpCodeSize());
+
 		byte[] netCodes = null;
 		switch (sourceLineParts.getArgumentCount()) {
 		case 0:
@@ -160,12 +161,11 @@ public class ASM {
 			netCodes = argCount1(sourceLineParts);
 			break;
 		case 2:
+			netCodes = argCount2(sourceLineParts);
 			break;
 		default:
 
 		}// switch - getArgumentCount()
-		instructionCounter.incrementCurrentLocation(sourceLineParts.getOpCodeSize());
-
 		return getInstructionCode(netCodes);
 	}// setMemoryBytesForInstruction
 
@@ -187,7 +187,6 @@ public class ASM {
 		SubInstruction si = SubInstructionSet.getSubInstruction(subOpCode);
 		byte ans[] = si.baseCodes.clone();
 		Pattern pattern = si.pattern1;
-		String argType = si.argument1Type;
 		String argument = sourceLineParts.getArgument1();
 		switch (si.argument1Type) {
 		case Z80.COND:
@@ -227,22 +226,57 @@ public class ASM {
 
 			break;
 		case Z80.EXP_DW:
-			value = resolveExpression(argument, sourceLineParts.getLineNumber());
-			value = value & 0XFFFF; // limit to 64K
-			byte hiByte = (byte) ((value >> 8) & 0XFF);
-			byte loByte = (byte) (value & 0XFF);
-			ans[1] = loByte;
-			ans[2] = hiByte;
-
+			ans = resolveDW(ans, argument, sourceLineParts.getLineNumber());
 			break;
 		default:
 		}// switch - arg type
 		return ans;
 	}// argCount1
 
-	private String argCount2() {
-		return null;
+	private byte[] argCount2(SourceLineParts sourceLineParts) {
+		int value;
+		String subOpCode = sourceLineParts.getSubOpCode();
+		SubInstruction si = SubInstructionSet.getSubInstruction(subOpCode);
+		byte ans[] = si.baseCodes.clone();
+		Pattern pattern = si.pattern1;
+		String argument1 = sourceLineParts.getArgument1();
+		String argument2 = sourceLineParts.getArgument2();
+		switch (si.argument1Type) {
+
+		case Z80.COND:
+			byte c = Z80.conditionTable.get(argument1);
+			ans[0] = (byte) (ans[0] | c);
+			ans = resolveDW(ans, argument2, sourceLineParts.getLineNumber());
+			break;
+			
+		case Z80.COND_LIMITED:
+			 c = Z80.conditionTable.get(argument1);
+			ans[0] = (byte) (ans[0] | c);
+			value = resolveExpression(argument2, sourceLineParts.getLineNumber());
+			ans[1] = (byte) (ans[1] | (byte) value);
+			break;
+			
+		case Z80.EXP_ADDR:
+			value = resolveExpression(argument1, sourceLineParts.getLineNumber());
+			ans[1] = (byte) (ans[1] | (byte) value);
+			
+		default:
+		}// switch arg 1
+
+		return ans;
 	}// argCount2
+
+	private byte[] resolveDW(byte[] target, String argument, int lineNumber) {
+		byte[] work = target.clone();
+		int offset = work.length - 2;
+		int value = resolveExpression(argument, lineNumber);
+		value = value & 0XFFFF; // limit to 64K
+		byte hiByte = (byte) ((value >> 8) & 0XFF);
+		byte loByte = (byte) (value & 0XFF);
+		work[offset] = loByte;
+		work[offset + 1] = hiByte;
+		return work;
+	}// resolveDW
 
 	// -----------------------------------------------
 
@@ -761,11 +795,11 @@ public class ASM {
 			}
 			answer = expression.getValue();
 		} catch (ParserException pe) {
-			//System.err.println(pe.getMessage());
-			String msg = String.format(" Line %04d has a  bad argument: %s",lineNumber,arguments);
+			// System.err.println(pe.getMessage());
+			String msg = String.format(" Line %04d has a  bad argument: %s", lineNumber, arguments);
 			reportError(msg);
 		} catch (EvaluationException ee) {
-			String msg = String.format(" Line %04d has a  bad argument: %s",lineNumber,arguments);
+			String msg = String.format(" Line %04d has a  bad argument: %s", lineNumber, arguments);
 			reportError(msg);
 		} // try
 		return answer;

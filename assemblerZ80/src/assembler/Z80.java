@@ -13,7 +13,11 @@ public final class Z80 {
 	public static final String EXP_DW = "EXP_DW";
 	public static final String EXP_IM = "EXP_IM";		// used for IM -> 0,1,2
 	public static final String EXP_RST = "EXP_RST";		// used for RST -> 0H,8H,10H,18H,20H,28H,30H,38H
-	public static final String EXP_ADDR = "EXP_ADDR";		// used for RST -> 0H,8H,10H,18H,20H,28H,30H,38H
+	public static final String EXP_ADDR = "EXP_ADDR";
+	
+	public static final String IND_HL = "IND_HL";
+	public static final String IND_XY = "IND_XY";
+	public static final String IND_XYd = "IND_XYd";
 
 
 	public static final Pattern patR8 = Pattern.compile("[A|B|C|D|E|H|L],|[A|B|C|D|E|H|L]\\b");
@@ -38,7 +42,7 @@ public final class Z80 {
 	public static final Pattern patIND_C = Pattern.compile("\\(C\\)");
 	public static final Pattern patIND_HL = Pattern.compile("\\(HL\\),|\\(HL\\)");
 	public static final Pattern patIND_SP = Pattern.compile("\\(SP\\),");
-	public static final Pattern patIND_XY = Pattern.compile("\\(X|Y\\)");
+	public static final Pattern patIND_XY = Pattern.compile("\\(I[X|Y]\\)");
 	public static final Pattern patIND_XYd = Pattern.compile("\\(I[X|Y]\\+.*\\)"); // last argument
 	public static final Pattern patIND_XYd1 = Pattern.compile("\\(I[X|Y]\\+.*\\),"); // first of 2 arguments
 

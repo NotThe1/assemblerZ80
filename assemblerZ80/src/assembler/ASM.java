@@ -188,6 +188,8 @@ public class ASM {
 		byte ans[] = si.baseCodes.clone();
 		Pattern pattern = si.pattern1;
 		String argument = sourceLineParts.getArgument1();
+		argument = argument.replaceAll("\\s", Z80.EMPTY_STRING);// remove all spaces
+
 		switch (si.argument1Type) {
 		case Z80.COND:
 			byte c = Z80.conditionTable.get(argument);
@@ -228,6 +230,27 @@ public class ASM {
 		case Z80.EXP_DW:
 			ans = resolveDW(ans, argument, sourceLineParts.getLineNumber());
 			break;
+
+		case Z80.IND_HL:
+			// do nothing no figuring out
+			break;
+
+		case Z80.IND_XY:
+			if (argument.equals("(IY)")) {
+				ans[0] = (byte) 0XFD;
+			} // else use the stored value for IX
+			break;
+
+		case Z80.IND_XYd:
+			if (argument.startsWith("(IY")) {
+				ans[0] = (byte) 0XFD;
+			} // else use the stored value for IX
+			String exp = argument.substring(4, argument.length() - 1);
+			value = resolveExpression(exp, sourceLineParts.getLineNumber());
+			ans[2] = (byte) (ans[2] | (byte) value);
+
+			break;
+
 		default:
 		}// switch - arg type
 		return ans;
@@ -248,18 +271,18 @@ public class ASM {
 			ans[0] = (byte) (ans[0] | c);
 			ans = resolveDW(ans, argument2, sourceLineParts.getLineNumber());
 			break;
-			
+
 		case Z80.COND_LIMITED:
-			 c = Z80.conditionTable.get(argument1);
+			c = Z80.conditionTable.get(argument1);
 			ans[0] = (byte) (ans[0] | c);
 			value = resolveExpression(argument2, sourceLineParts.getLineNumber());
 			ans[1] = (byte) (ans[1] | (byte) value);
 			break;
-			
+
 		case Z80.EXP_ADDR:
 			value = resolveExpression(argument1, sourceLineParts.getLineNumber());
 			ans[1] = (byte) (ans[1] | (byte) value);
-			
+
 		default:
 		}// switch arg 1
 

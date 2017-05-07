@@ -208,8 +208,56 @@ public class SubInstructionSet {
 		baseCodes = new byte[] { (byte) 0XCD,(byte) 0X00,(byte) 0X00};
 		subInstructions.put("CALL_2",new SubInstruction("CALL_2", 3,Z80.EXP_DW,Z80.patEXP,baseCodes));
 
-		baseCodes = new byte[] { (byte) 0Xc3,(byte) 0X00,(byte) 0X00};
+		baseCodes = new byte[] { (byte) 0XC3,(byte) 0X00,(byte) 0X00};
 		subInstructions.put("JP_4",new SubInstruction("JP_4", 3,Z80.EXP_DW,Z80.patEXP,baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XE9};
+		subInstructions.put("JP_3",new SubInstruction("JP_3", 1,Z80.IND_HL,Z80.patIND_HL,baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XDD,(byte) 0XE9};
+		subInstructions.put("JP_2",new SubInstruction("JP_2", 2,Z80.IND_XY,Z80.patIND_XY,baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XDD,(byte) 0XBE,(byte) 0X00};
+		subInstructions.put("CP_1",new SubInstruction("CP_1", 3,Z80.IND_XYd,Z80.patIND_XYd,baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XDD,(byte) 0X35,(byte) 0X00};
+		subInstructions.put("DEC_1",new SubInstruction("DEC_1", 3,Z80.IND_XYd,Z80.patIND_XYd,baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XDD,(byte) 0X34,(byte) 0X00};
+		subInstructions.put("INC_1",new SubInstruction("INC_1", 3,Z80.IND_XYd,Z80.patIND_XYd,baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XDD,(byte) 0XB6,(byte) 0X00};
+		subInstructions.put("OR_1",new SubInstruction("OR_1", 3,Z80.IND_XYd,Z80.patIND_XYd,baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XDD,(byte) 0X96,(byte) 0X00};
+		subInstructions.put("SUB_1",new SubInstruction("SUB_1", 3,Z80.IND_XYd,Z80.patIND_XYd,baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XDD,(byte) 0XAE,(byte) 0X00};
+		subInstructions.put("XOR_1",new SubInstruction("XOR_1", 3,Z80.IND_XYd,Z80.patIND_XYd,baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XDD,(byte) 0XA6,(byte) 0X00};
+		subInstructions.put("AND_1",new SubInstruction("AND_1", 3,Z80.IND_XYd,Z80.patIND_XYd,baseCodes));
+//
+		baseCodes = new byte[] { (byte) 0XDD,(byte) 0XCB,(byte) 0X00,(byte) 0X16};
+		subInstructions.put("RL_1",new SubInstruction("RL_1", 4,Z80.IND_XYd,Z80.patIND_XYd,baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XDD,(byte) 0XCB,(byte) 0X00,(byte) 0X06};
+		subInstructions.put("RLC_1",new SubInstruction("RLC_1", 4,Z80.IND_XYd,Z80.patIND_XYd,baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XDD,(byte) 0XCB,(byte) 0X00,(byte) 0X1E};
+		subInstructions.put("RR_1",new SubInstruction("RR_1", 4,Z80.IND_XYd,Z80.patIND_XYd,baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XDD,(byte) 0XCB,(byte) 0X00,(byte) 0X0E};
+		subInstructions.put("RRC_1",new SubInstruction("RRC_1", 4,Z80.IND_XYd,Z80.patIND_XYd,baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XDD,(byte) 0XCB,(byte) 0X00,(byte) 0X26};
+		subInstructions.put("SLA_1",new SubInstruction("SLA_1", 4,Z80.IND_XYd,Z80.patIND_XYd,baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XDD,(byte) 0XCB,(byte) 0X00,(byte) 0X2E};
+		subInstructions.put("SRA_1",new SubInstruction("SRA_1", 4,Z80.IND_XYd,Z80.patIND_XYd,baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XDD,(byte) 0XCB,(byte) 0X00,(byte) 0X3E};
+		subInstructions.put("SRL_1",new SubInstruction("SRL_1", 4,Z80.IND_XYd,Z80.patIND_XYd,baseCodes));
 
 
 		

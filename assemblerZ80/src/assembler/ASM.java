@@ -111,11 +111,11 @@ public class ASM {
 	 * passTwo makes final pass at source, using symbol table to generate the object code
 	 */
 	private ByteBuffer passTwo() {
-		int hiAddress = ((((instructionCounter.getCurrentLocation() - 1) / SIXTEEN) + 1) * SIXTEEN) - 1;
+		int hiAddress = ((((instructionCounter.getCurrentLocation() - 1) / SIXTEEN) + 2) * SIXTEEN) - 1;
 		ByteBuffer memoryImage = ByteBuffer.allocate(hiAddress + 1);
 
-		// System.out.printf("[passTwo] lowest location: %04X, highest Location: %04X%n",
-		// instructionCounter.getLowestLocationSet(), hiAddress);
+//		 System.out.printf("[passTwo] lowest location: %04X, highest Location: %04X%n",
+//		           instructionCounter.getLowestLocationSet(), hiAddress);
 
 		instructionCounter.reset();
 		clearDoc(docListing);
@@ -203,14 +203,14 @@ public class ASM {
 				ans[1] = (byte) 0X56;
 			} else if (value == 2) {
 				ans[1] = (byte) 0X5E;
-			}else{
+			} else {
 				String msg = String.format("%s on Line %04d is an invalid argument, must resolve to 0,1 or 2", argument,
 						sourceLineParts.getLineNumber());
-				reportError(msg);	
+				reportError(msg);
 			} // if
 			break;
 		case Z80.EXP_RST:
-			 value = resolveExpression(argument, sourceLineParts.getLineNumber());
+			value = resolveExpression(argument, sourceLineParts.getLineNumber());
 			if ((value > 56) | (value % 8 != 0)) {
 				String msg = String.format("%s on Line %04d is an invalid argument", argument,
 						sourceLineParts.getLineNumber());
@@ -246,25 +246,24 @@ public class ASM {
 			value = resolveExpression(exp, sourceLineParts.getLineNumber());
 			ans[2] = (byte) (ans[2] | (byte) value);
 			break;
-						
+
 		case Z80.R16_XY:
 			if (argument.equals("IY")) {
 				ans[0] = (byte) 0XFD;
 			} // else use the stored value for IX
 			break;
-			
+
 		case Z80.R8M_S3:
-			 c = Z80.registerTable.get(argument);
-			 c= (byte) (c<<3);
+			c = Z80.registerTable.get(argument);
+			c = (byte) (c << 3);
 			ans[0] = (byte) (ans[0] | c);
 			break;
-			
+
 		case Z80.R_MAIN:
-			 c = Z80.registerTable.get(argument);
-			  int index = ans.length-1;
-				ans[index] = (byte) (ans[index] | c);
+			c = Z80.registerTable.get(argument);
+			int index = ans.length - 1;
+			ans[index] = (byte) (ans[index] | c);
 			break;
-			
 
 		default:
 		}// switch - arg type
@@ -276,7 +275,6 @@ public class ASM {
 		String subOpCode = sourceLineParts.getSubOpCode();
 		SubInstruction si = SubInstructionSet.getSubInstruction(subOpCode);
 		byte ans[] = si.baseCodes.clone();
-		Pattern pattern = si.pattern1;
 		String argument1 = sourceLineParts.getArgument1();
 		String argument2 = sourceLineParts.getArgument2();
 		switch (si.argument1Type) {
@@ -297,6 +295,36 @@ public class ASM {
 		case Z80.EXP_ADDR:
 			value = resolveExpression(argument1, sourceLineParts.getLineNumber());
 			ans[1] = (byte) (ans[1] | (byte) value);
+			break;
+
+		case Z80.EXP_BIT:
+			value = resolveExpression(argument1, sourceLineParts.getLineNumber());
+			Byte bitValue = Z80.bitTable.get(value);
+			if (bitValue==null) {
+				String msg = String.format("%s on Line %04d is an invalid argument, must resolve to 0 thru 7",
+						argument1, sourceLineParts.getLineNumber());
+				reportError(msg);
+				break;
+			} // if - value
+
+			if (si.argument2Type.equals(Z80.R_MAIN)) {
+				ans[1]= (byte) (ans[1] | (byte) bitValue);
+				c = Z80.registerTable.get(argument2);
+				ans[1] = (byte) (ans[1] | c);
+
+			} else { // IND_XYd
+				if (argument2.startsWith("(IY")) {
+					ans[0] = (byte) 0XFD;
+				} // if use the stored value for IX
+				
+				String exp = argument2.substring(4, argument2.length() - 1);
+				value = resolveExpression(exp, sourceLineParts.getLineNumber());
+				ans[2] = (byte) (ans[2] | (byte) value);
+				
+				ans[3]= (byte) (ans[3] | (byte) bitValue);
+			}// if argument 2 type
+
+			break;
 
 		default:
 		}// switch arg 1
@@ -395,6 +423,7 @@ public class ASM {
 	}// setMemoryBytesForDirective
 
 	private void buildMemoryImage(int pc, String lineImage, ByteBuffer memoryImage0) {
+		
 		int numOfChars = lineImage.length() / 2;
 		if (numOfChars < 1) {
 			return;
@@ -1234,6 +1263,8 @@ public class ASM {
 	private static final String binaryValuePattern = "[01]B";
 	private static final String decimalValuePattern = "[0-9]{1,4}D?+";
 	private static final String stringValuePattern = "\\A'.*'\\z"; // used for
+	
+	
 
 	// private static final String r8r8Pattern = "[ABCDEHLM],[ABCDEHLM]";
 	// private static final String r16dPattern = "B|BC|D|DE|H|HL|SP";

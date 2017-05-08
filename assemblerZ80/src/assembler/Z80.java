@@ -15,6 +15,12 @@ public final class Z80 {
 	public static final String EXP_RST = "EXP_RST";		// used for RST -> 0H,8H,10H,18H,20H,28H,30H,38H
 	public static final String EXP_ADDR = "EXP_ADDR";
 	
+	public static final String R_MAIN = "R_MAIN";	// used for all standard 8080 registers
+	
+	public static final String R16_XY = "R16_XY";
+	public static final String R8M = "R8M";		// basic 8 bit regisers including M
+	public static final String R8M_S3 = "R8M_S3";	// R8M to be shifted 3 bits left
+	
 	public static final String IND_HL = "IND_HL";
 	public static final String IND_XY = "IND_XY";
 	public static final String IND_XYd = "IND_XYd";
@@ -68,7 +74,28 @@ public final class Z80 {
 		conditionTable.put("PE",(byte) 0b00101000);
 		conditionTable.put("P", (byte) 0b00110000);
 		conditionTable.put("M", (byte) 0b00111000);
-	}//static
+	}//static conditionTable
+	
+	public static final HashMap<String,Byte> registerTable = new HashMap<>();
+	static{
+		registerTable.put("A",(byte) 0b00000111);
+		registerTable.put("B",(byte) 0b00000000);
+		registerTable.put("C",(byte) 0b00000001);
+		registerTable.put("D",(byte) 0b00000010);
+		registerTable.put("E",(byte) 0b00000011);
+		registerTable.put("H",(byte) 0b00000100);
+		registerTable.put("L",(byte) 0b00000101);
+		registerTable.put("M",(byte) 0b00000110);
+		registerTable.put("(HL)",(byte) 0b00000110);
+		
+		registerTable.put("BC",(byte) 0b00000000);
+		registerTable.put("DE",(byte) 0b00010000);
+		registerTable.put("HL",(byte) 0b00100000);
+		registerTable.put("SP",(byte) 0b00110000);
+		registerTable.put("AF",(byte) 0b00110000);
+	}//static registerTable
+
+	
 	
 	public Z80(){
 		

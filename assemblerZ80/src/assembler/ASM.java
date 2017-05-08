@@ -248,8 +248,26 @@ public class ASM {
 			String exp = argument.substring(4, argument.length() - 1);
 			value = resolveExpression(exp, sourceLineParts.getLineNumber());
 			ans[2] = (byte) (ans[2] | (byte) value);
-
 			break;
+						
+		case Z80.R16_XY:
+			if (argument.equals("IY")) {
+				ans[0] = (byte) 0XFD;
+			} // else use the stored value for IX
+			break;
+			
+		case Z80.R8M_S3:
+			 c = Z80.registerTable.get(argument);
+			 c= (byte) (c<<3);
+			ans[0] = (byte) (ans[0] | c);
+			break;
+			
+		case Z80.R_MAIN:
+			 c = Z80.registerTable.get(argument);
+			  int index = ans.length-1;
+				ans[index] = (byte) (ans[index] | c);
+			break;
+			
 
 		default:
 		}// switch - arg type

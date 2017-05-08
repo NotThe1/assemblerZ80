@@ -6,15 +6,13 @@ Value55AA	EQU	055AAH
 		ORG      0100H
 Start:
 
-
-
 		
 		CALL	1234H		; CD dw
 		CALL	$			; CD dw
 		JP		55AAH		; C3 dw
 		JP		Start		; C3 dw
 		CALL	$ + 1234H	; CD dw
-		JP		$
+		JP		$			; C3 DW
 		
 		AND		01			; E6 db
 		AND		Value55AA	; E6 db
@@ -38,6 +36,8 @@ Start:
 		IM		0		; ED 46
 		IM		1		; ED 56
 		IM		2		; ED 5E
+		IM		Value55
+
 
 		RET				; C9
 		RET		NZ		; C0

@@ -186,7 +186,6 @@ public class ASM {
 		String subOpCode = sourceLineParts.getSubOpCode();
 		SubInstruction si = SubInstructionSet.getSubInstruction(subOpCode);
 		byte ans[] = si.baseCodes.clone();
-		Pattern pattern = si.pattern1;
 		String argument = sourceLineParts.getArgument1();
 		argument = argument.replaceAll("\\s", Z80.EMPTY_STRING);// remove all spaces
 
@@ -196,24 +195,22 @@ public class ASM {
 			ans[0] = (byte) (ans[0] | c);
 			break;
 		case Z80.EXP_IM:
-			Matcher m = pattern.matcher(argument);
-			if (!m.matches()) {
-				String msg = String.format("%s on Line %04d is an invalid argument", argument,
-						sourceLineParts.getLineNumber());
-				reportError(msg);
-				break;
-			} // if
+			int value = resolveExpression(argument, sourceLineParts.getLineNumber());
 
-			if (argument.equals("0")) {
+			if (value == 0) {
 				ans[1] = (byte) 0X46;
-			} else if (argument.equals("1")) {
+			} else if (value == 1) {
 				ans[1] = (byte) 0X56;
-			} else if (argument.equals("2")) {
+			} else if (value == 2) {
 				ans[1] = (byte) 0X5E;
+			}else{
+				String msg = String.format("%s on Line %04d is an invalid argument, must resolve to 0,1 or 2", argument,
+						sourceLineParts.getLineNumber());
+				reportError(msg);	
 			} // if
 			break;
 		case Z80.EXP_RST:
-			int value = resolveExpression(argument, sourceLineParts.getLineNumber());
+			 value = resolveExpression(argument, sourceLineParts.getLineNumber());
 			if ((value > 56) | (value % 8 != 0)) {
 				String msg = String.format("%s on Line %04d is an invalid argument", argument,
 						sourceLineParts.getLineNumber());

@@ -63,6 +63,10 @@ public class SubInstruction {
 		return baseCodes.length;
 	}//getSize
 	
+	public String getInstruction(){
+		return this.instruction;
+	}//getSize
+	
 
 
 	

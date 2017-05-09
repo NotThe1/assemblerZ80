@@ -76,6 +76,7 @@ public class ASM {
 	private String outputPathAndBase;
 	private File asmSourceFile = null;
 	private String sourceFileBase;
+	private String sourceFileFullName;
 
 	private StyledDocument docSource;
 	private StyledDocument docListing;
@@ -114,8 +115,8 @@ public class ASM {
 		int hiAddress = ((((instructionCounter.getCurrentLocation() - 1) / SIXTEEN) + 2) * SIXTEEN) - 1;
 		ByteBuffer memoryImage = ByteBuffer.allocate(hiAddress + 1);
 
-//		 System.out.printf("[passTwo] lowest location: %04X, highest Location: %04X%n",
-//		           instructionCounter.getLowestLocationSet(), hiAddress);
+		// System.out.printf("[passTwo] lowest location: %04X, highest Location: %04X%n",
+		// instructionCounter.getLowestLocationSet(), hiAddress);
 
 		instructionCounter.reset();
 		clearDoc(docListing);
@@ -152,21 +153,23 @@ public class ASM {
 		// String instructionStr = EMPTY_STRING;
 		instructionCounter.incrementCurrentLocation(sourceLineParts.getOpCodeSize());
 
-		byte[] netCodes = null;
-		switch (sourceLineParts.getArgumentCount()) {
-		case 0:
-			netCodes = argCount0(sourceLineParts);
-			break;
-		case 1:
-			netCodes = argCount1(sourceLineParts);
-			break;
-		case 2:
-			netCodes = argCount2(sourceLineParts);
-			break;
-		default:
-
-		}// switch - getArgumentCount()
+		byte[] netCodes = getActualCodes(sourceLineParts);
 		return getInstructionCode(netCodes);
+
+		// switch (sourceLineParts.getArgumentCount()) {
+		// case 0:
+		// netCodes = argCount0(sourceLineParts);
+		// break;
+		// case 1:
+		// netCodes = argCount1(sourceLineParts);
+		// break;
+		// case 2:
+		// netCodes = argCount2(sourceLineParts);
+		// break;
+		// default:
+		//
+		// }// switch - getArgumentCount()
+		// return getInstructionCode(netCodes);
 	}// setMemoryBytesForInstruction
 
 	private String getInstructionCode(byte[] baseCodes) {
@@ -175,7 +178,84 @@ public class ASM {
 			sb.append(String.format("%02X ", baseCodes[i]));
 		} // for
 		return sb.toString().trim();
-	}
+	}// getInstructionCode
+
+	// <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+	private byte[] getActualCodes(SourceLineParts sourceLineParts) {
+		String subOpCode = sourceLineParts.getSubOpCode();
+		SubInstruction si = SubInstructionSet.getSubInstruction(subOpCode);
+		byte ans[] = si.baseCodes.clone();
+		String argument1 = sourceLineParts.getArgument1();
+		// argument1 = argument1.replaceAll("\\s", Z80.EMPTY_STRING);// remove all spaces
+		String argument2 = sourceLineParts.getArgument2();
+		// argument2 = argument1.replaceAll("\\s", Z80.EMPTY_STRING);// remove all spaces
+		byte regByte;
+		int value;
+
+		switch (si.getInstruction()) {
+		case "ADC":
+			
+			if (si.argument1Type.equals(Z80.LIT_HL)) { // ADC_4
+				regByte = Z80.registerTable.get(argument2);
+				ans[1] = (byte) (ans[1] | regByte);
+			} else {// arg1 is LIT_A
+				if (si.argument2Type.equals(Z80.R_MAIN)) {	//ADC_2
+					regByte = Z80.registerTable.get(argument2);
+					ans[0] = (byte) (ans[0] | regByte);
+				} else if (si.argument2Type.equals(Z80.IND_XYd)) {	//ADC_1
+					if (argument2.startsWith("(IY")) {
+						ans[0] = (byte) 0XFD;
+					} // else use the stored value for IX
+					String exp = argument2.substring(4, argument2.length() - 1);
+					value = resolveExpression(exp, sourceLineParts.getLineNumber());
+					ans[2] = (byte) (ans[2] | value);
+				}else{		//ADC_3
+					value = resolveExpression(argument2, sourceLineParts.getLineNumber());
+					ans[1] = (byte) (ans[1] |  value);
+				}//inner else
+			} // outer if
+			break;
+			
+
+		case "ADD":
+			
+			if (si.argument1Type.equals(Z80.LIT_HL)) { // ADD_4
+				regByte = Z80.registerTable.get(argument2);
+				ans[0] = (byte) (ans[0] | regByte);
+			}else if (si.argument2Type.equals(Z80.R16_IX)){//ADD_5
+				if (argument1.startsWith("(IY")) {
+					ans[0] = (byte) 0XFD;
+				} // else use the stored value for IX
+				regByte = Z80.registerTable.get(argument2);
+				ans[1] = (byte) (ans[1] | regByte);	
+			} else {// arg1 is LIT_A
+				if (si.argument2Type.equals(Z80.R_MAIN)) {	//ADD_2
+					regByte = Z80.registerTable.get(argument2);
+					ans[0] = (byte) (ans[0] | regByte);
+				} else if (si.argument2Type.equals(Z80.IND_XYd)) {	//ADD_1
+					if (argument2.startsWith("(IY")) {
+						ans[0] = (byte) 0XFD;
+					} // else use the stored value for IX
+					String exp = argument2.substring(4, argument2.length() - 1);
+					value = resolveExpression(exp, sourceLineParts.getLineNumber());
+					ans[2] = (byte) (ans[2] | value);
+				}else{		//ADC_3
+					value = resolveExpression(argument2, sourceLineParts.getLineNumber());
+					ans[1] = (byte) (ans[1] |  value);
+				}//inner else
+			} // outer if
+			break;
+			
+
+		default:
+
+		}// switch Instruction
+
+		return ans;
+	}// getActualCodes
+	
+
+		// <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 
 	private byte[] argCount0(SourceLineParts sourceLineParts) {
 		String subOpCode = sourceLineParts.getSubOpCode();
@@ -300,7 +380,7 @@ public class ASM {
 		case Z80.EXP_BIT:
 			value = resolveExpression(argument1, sourceLineParts.getLineNumber());
 			Byte bitValue = Z80.bitTable.get(value);
-			if (bitValue==null) {
+			if (bitValue == null) {
 				String msg = String.format("%s on Line %04d is an invalid argument, must resolve to 0 thru 7",
 						argument1, sourceLineParts.getLineNumber());
 				reportError(msg);
@@ -308,7 +388,7 @@ public class ASM {
 			} // if - value
 
 			if (si.argument2Type.equals(Z80.R_MAIN)) {
-				ans[1]= (byte) (ans[1] | (byte) bitValue);
+				ans[1] = (byte) (ans[1] | (byte) bitValue);
 				c = Z80.registerTable.get(argument2);
 				ans[1] = (byte) (ans[1] | c);
 
@@ -316,16 +396,65 @@ public class ASM {
 				if (argument2.startsWith("(IY")) {
 					ans[0] = (byte) 0XFD;
 				} // if use the stored value for IX
-				
+
 				String exp = argument2.substring(4, argument2.length() - 1);
 				value = resolveExpression(exp, sourceLineParts.getLineNumber());
 				ans[2] = (byte) (ans[2] | (byte) value);
-				
-				ans[3]= (byte) (ans[3] | (byte) bitValue);
-			}// if argument 2 type
+
+				ans[3] = (byte) (ans[3] | (byte) bitValue);
+			} // if argument 2 type
 
 			break;
 
+		case Z80.IND_BCDE:
+			if (argument1.equals("(DE)")) {
+				ans[0] = (byte) 0X12;
+			} // else is BC , use the default
+			break;
+
+		case Z80.IND_C:
+			if (argument2.equals("0")) {
+				argument2 = "M";
+			} // force
+			c = Z80.registerTable.get(argument2);
+			c = (byte) (c << 3);
+			ans[1] = (byte) (ans[1] | c);
+			break;
+
+		case Z80.IND_HL:
+			if (si.argument2Type.equals(Z80.R_MAIN)) {
+				c = Z80.registerTable.get(argument2);
+				ans[0] = (byte) (ans[0] | c);
+			} else { // Expression
+				value = resolveExpression(argument2, sourceLineParts.getLineNumber());
+				ans[1] = (byte) (ans[1] | (byte) value);
+			} // if
+			break;
+
+		case Z80.IND_SP:
+			if (argument2.equals("IY")) {
+				ans[0] = (byte) 0XFD;
+			} // if use the stored value for IX
+				// both defaults are accurate otherwise
+			break;
+
+		case Z80.IND_XYd:
+			if (argument1.startsWith("(IY")) {
+				ans[0] = (byte) 0XFD;
+			} // if use the stored value for IX
+
+			String exp = argument1.substring(4, argument1.length() - 1);
+			value = resolveExpression(exp, sourceLineParts.getLineNumber());
+			ans[2] = (byte) (ans[2] | (byte) value);
+			if (si.argument2Type.equals(Z80.R_MAIN)) {
+				c = Z80.registerTable.get(argument2);
+				ans[1] = (byte) (ans[1] | c);
+			} else { // expression
+				value = resolveExpression(argument2, sourceLineParts.getLineNumber());
+				ans[3] = (byte) (ans[3] | value);
+			} // if
+
+			break;
 		default:
 		}// switch arg 1
 
@@ -423,7 +552,7 @@ public class ASM {
 	}// setMemoryBytesForDirective
 
 	private void buildMemoryImage(int pc, String lineImage, ByteBuffer memoryImage0) {
-		
+
 		int numOfChars = lineImage.length() / 2;
 		if (numOfChars < 1) {
 			return;
@@ -761,25 +890,53 @@ public class ASM {
 			// txtSource.setText("");
 			// txtListing.setText("");
 			asmSourceFile = chooserOpen.getSelectedFile();
-			String asmSourceFileName = asmSourceFile.getName();
+			prepareSourceFile(asmSourceFile);
+//			String asmSourceFileName = asmSourceFile.getName();
 			// String asmSourceDirectory = asmSourceFile.getPath();
-			String[] nameParts = (asmSourceFileName.split("\\."));
-			sourceFileBase = nameParts[0];
-			lblSourceFilePath.setText(asmSourceFile.getAbsolutePath());
-			lblSourceFileName.setText(asmSourceFile.getName());
-			lblListingFileName.setText(sourceFileBase + "." + SUFFIX_LISTING);
-			defaultDirectory = asmSourceFile.getParent();
-			outputPathAndBase = defaultDirectory + FILE_SEPARATOR + sourceFileBase;
-
-			// lblSource.setText(sourceFileName);
-			// lblListing.setText(replaceWithListingFileName(sourceFileName));
-			clearDoc(docSource);
-			clearDoc(docListing);
-			loadSourceFile(asmSourceFile, 1, null);
-			tpSource.setCaretPosition(0);
-			btnStart.setEnabled(true);
+//			String[] nameParts = (asmSourceFileName.split("\\."));
+//			sourceFileBase = nameParts[0];
+//			lblSourceFilePath.setText(asmSourceFile.getAbsolutePath());
+//			sourceFileFullName = asmSourceFile.getAbsolutePath();
+//			lblSourceFileName.setText(asmSourceFile.getName());
+//			lblListingFileName.setText(sourceFileBase + "." + SUFFIX_LISTING);
+//			defaultDirectory = asmSourceFile.getParent();
+//			outputPathAndBase = defaultDirectory + FILE_SEPARATOR + sourceFileBase;
+//
+//			// lblSource.setText(sourceFileName);
+//			// lblListing.setText(replaceWithListingFileName(sourceFileName));
+//			clearDoc(docSource);
+//			clearDoc(docListing);
+//			loadSourceFile(asmSourceFile, 1, null);
+//			tpSource.setCaretPosition(0);
+//			btnStart.setEnabled(true);
 		} // if
 	}// openFile
+	
+	private void prepareSourceFile(File asmSourceFile){
+		String asmSourceFileName = asmSourceFile.getName();
+		// String asmSourceDirectory = asmSourceFile.getPath();
+		String[] nameParts = (asmSourceFileName.split("\\."));
+		sourceFileBase = nameParts[0];
+		lblSourceFilePath.setText(asmSourceFile.getAbsolutePath());
+		sourceFileFullName = asmSourceFile.getAbsolutePath();
+		lblSourceFileName.setText(asmSourceFile.getName());
+		lblListingFileName.setText(sourceFileBase + "." + SUFFIX_LISTING);
+		defaultDirectory = asmSourceFile.getParent();
+		outputPathAndBase = defaultDirectory + FILE_SEPARATOR + sourceFileBase;
+
+		// lblSource.setText(sourceFileName);
+		// lblListing.setText(replaceWithListingFileName(sourceFileName));
+		clearDoc(docSource);
+		clearDoc(docListing);
+		loadSourceFile(asmSourceFile, 1, null);
+		tpSource.setCaretPosition(0);
+		btnStart.setEnabled(true);
+	}//prepareSourceFile
+	
+	private void doLoadLastFile(){
+		asmSourceFile = new File(sourceFileFullName);
+		prepareSourceFile(asmSourceFile);
+	}//doLoadLastFile
 
 	private void clearDoc(StyledDocument doc) {
 		try {
@@ -925,6 +1082,7 @@ public class ASM {
 		myPrefs.putBoolean("rbHexFile", rbHexFile.isSelected());
 
 		myPrefs.put("defaultDirectory", defaultDirectory);
+		myPrefs.put("LastFile", sourceFileFullName);
 		myPrefs = null;
 
 		// cleanUp
@@ -941,6 +1099,7 @@ public class ASM {
 		rbListing.setSelected(myPrefs.getBoolean("rbListing", true));
 		rbMemFile.setSelected(myPrefs.getBoolean("rbMemFile", true));
 		rbHexFile.setSelected(myPrefs.getBoolean("rbHexFile", true));
+		sourceFileFullName = myPrefs.get("LastFile", "");
 		myPrefs = null;
 
 		docSource = tpSource.getStyledDocument();
@@ -1073,19 +1232,16 @@ public class ASM {
 		gbc_rbHexFile.gridy = 6;
 		panelLeft.add(rbHexFile, gbc_rbHexFile);
 
-		JButton btnTest = new JButton("test");
-		btnTest.setVisible(false);
-		btnTest.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent arg0) {
-
-			}//
-		});
-		GridBagConstraints gbc_btnTest = new GridBagConstraints();
-		gbc_btnTest.anchor = GridBagConstraints.NORTH;
-		gbc_btnTest.insets = new Insets(0, 0, 0, 5);
-		gbc_btnTest.gridx = 0;
-		gbc_btnTest.gridy = 10;
-		panelLeft.add(btnTest, gbc_btnTest);
+		JButton btnLoadLastFile = new JButton("Load Last File");
+		btnLoadLastFile.setName(BTN_LOAD_LAST_FILE);
+		btnLoadLastFile.addActionListener(adapterForASM);
+		
+		GridBagConstraints gbc_btnLoadLastFile = new GridBagConstraints();
+		gbc_btnLoadLastFile.anchor = GridBagConstraints.NORTH;
+		gbc_btnLoadLastFile.insets = new Insets(0, 0, 0, 5);
+		gbc_btnLoadLastFile.gridx = 0;
+		gbc_btnLoadLastFile.gridy = 10;
+		panelLeft.add(btnLoadLastFile, gbc_btnLoadLastFile);
 
 		splitPane = new JSplitPane();
 		splitPane.setDividerSize(8);
@@ -1195,6 +1351,9 @@ public class ASM {
 			case START_BUTTON:
 				start();
 				break;
+				
+			case BTN_LOAD_LAST_FILE:
+				doLoadLastFile();
 			default:
 			}// switch
 
@@ -1232,6 +1391,7 @@ public class ASM {
 	// private static final String RE_ASSEMBLE = "Reassemble";
 
 	private static final String START_BUTTON = "btnStart";
+	private static final String BTN_LOAD_LAST_FILE = "btnLoadLastFile";
 	private static final String NO_FILE = "<No File Selected>";
 	private static final String MNU_FILE_OPEN = "mnuFileOpen";
 	private static final String MNU_FILE_PRINT_SOURCE = "mnuFilePrintSource";
@@ -1263,8 +1423,6 @@ public class ASM {
 	private static final String binaryValuePattern = "[01]B";
 	private static final String decimalValuePattern = "[0-9]{1,4}D?+";
 	private static final String stringValuePattern = "\\A'.*'\\z"; // used for
-	
-	
 
 	// private static final String r8r8Pattern = "[ABCDEHLM],[ABCDEHLM]";
 	// private static final String r16dPattern = "B|BC|D|DE|H|HL|SP";

@@ -9,6 +9,7 @@ public final class Z80 {
 
 	public static final String COND = "COND";
 	public static final String COND_LIMITED = "COND_LIMITED";
+	public static final String EXP = "EXP";
 	public static final String EXP_DB = "EXP_DB";
 	public static final String EXP_DW = "EXP_DW";
 	public static final String EXP_BIT = "EXP_BIT";
@@ -19,12 +20,29 @@ public final class Z80 {
 	public static final String R_MAIN = "R_MAIN"; // used for all standard 8080 registers
 
 	public static final String R16_XY = "R16_XY";
+	public static final String R16_SP = "R16_SP";
+	public static final String R16_IX = "R16_IX";
 	public static final String R8M = "R8M"; // basic 8 bit regisers including M
 	public static final String R8M_S3 = "R8M_S3"; // R8M to be shifted 3 bits left
 
+	//------------------------------------------------
+	
+	public static final String IND_BCDE = "IND_BCDE";
+	public static final String IND_C = "IND_C";
 	public static final String IND_HL = "IND_HL";
+	public static final String IND_SP = "IND_SP";
 	public static final String IND_XY = "IND_XY";
 	public static final String IND_XYd = "IND_XYd";
+	
+	
+	public static final String LIT_A = "LIT_A";
+	public static final String LIT_HL = "LIT_HL";
+	public static final String LIT_IXY = "LIT_IXY";
+	
+	
+	
+	
+	//-------------------------------
 
 	public static final Pattern patR8 = Pattern.compile("[A|B|C|D|E|H|L],|[A|B|C|D|E|H|L]\\b");
 	public static final Pattern patR81 = Pattern.compile("[A|B|C|D|E|H|L],");
@@ -35,7 +53,6 @@ public final class Z80 {
 	public static final Pattern patR16_BCDE = Pattern.compile("BC|DE");
 	public static final Pattern patR16_AF = Pattern.compile("BC|DE|HL|AF");
 	public static final Pattern patR16_SP = Pattern.compile("BC,|DE,|HL,|SP,|BC|DE|HL|SP");
-	public static final Pattern patR16_XY = Pattern.compile("IX,|IY,|IX|IY");
 	public static final Pattern patR16_IX = Pattern.compile("BC|DE|SP|IX");
 
 	public static final Pattern patLIT_A = Pattern.compile("A,|A");
@@ -43,6 +60,7 @@ public final class Z80 {
 	public static final Pattern patLIT_AFP = Pattern.compile("AF\\'");
 	public static final Pattern patLIT_DE = Pattern.compile("DE");
 	public static final Pattern patLIT_HL = Pattern.compile("HL,|HL");
+	public static final Pattern patLIT_IXY = Pattern.compile("IX,|IY,|IX|IY");
 	public static final Pattern patLIT_SP = Pattern.compile("SP,|SP");
 
 	public static final Pattern patIND_BCDE = Pattern.compile("\\(BC\\)|\\(DE\\)");
@@ -93,6 +111,9 @@ public final class Z80 {
 		registerTable.put("HL", (byte) 0b00100000);
 		registerTable.put("SP", (byte) 0b00110000);
 		registerTable.put("AF", (byte) 0b00110000);
+		registerTable.put("IX", (byte) 0b00100000);
+		registerTable.put("IY", (byte) 0b00100000);
+
 	}// static registerTable
 
 	public static final HashMap<Integer, Byte> bitTable = new HashMap<>();

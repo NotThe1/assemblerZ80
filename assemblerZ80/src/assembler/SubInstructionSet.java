@@ -318,40 +318,6 @@ public class SubInstructionSet {
 
 		// Two Arguments ...................................................
 
-		baseCodes = new byte[] { (byte) 0XDD, (byte) 0XCB, (byte) 0X00, (byte) 0X46 };
-		subInstructions.put("BIT_1", new SubInstruction("BIT_1", Z80.EXP_BIT, Z80.IND_XYd, baseCodes));
-
-		baseCodes = new byte[] { (byte) 0XDD, (byte) 0XCB, (byte) 0X00, (byte) 0X86 };
-		subInstructions.put("RES_1", new SubInstruction("RES_1", Z80.EXP_BIT, Z80.IND_XYd, baseCodes));
-
-		baseCodes = new byte[] { (byte) 0XDD, (byte) 0XCB, (byte) 0X00, (byte) 0XC6 };
-		subInstructions.put("SET_1", new SubInstruction("SET_1", Z80.EXP_BIT, Z80.IND_XYd, baseCodes));
-
-		baseCodes = new byte[] {  (byte) 0XCB, (byte) 0X40};
-		subInstructions.put("BIT_2", new SubInstruction("BIT_2", Z80.EXP_BIT, Z80.R_MAIN, baseCodes));
-
-		baseCodes = new byte[] {  (byte) 0XCB, (byte) 0X80,  };
-		subInstructions.put("RES_2", new SubInstruction("RES_2", Z80.EXP_BIT, Z80.R_MAIN, baseCodes));
-
-		baseCodes = new byte[] {  (byte) 0XCB, (byte) 0XC0, };
-		subInstructions.put("SET_2", new SubInstruction("SET_2", Z80.EXP_BIT, Z80.R_MAIN, baseCodes));
-
-		// Two Arguments ...................................................
-
-//		baseCodes = new byte[] { (byte) 0XDD, (byte) 0X86, (byte) 0X00 };
-//		subInstructions.put("ADC_1",
-//				new SubInstruction("ADC_1", 3, "A", Z80.patLIT_A, "IX", Z80.patIND_XYd, baseCodes));
-//
-//		baseCodes = new byte[] { (byte) 0X80 };
-//		subInstructions.put("ADC_2", new SubInstruction("ADC_2", 1, "A", Z80.patLIT_A, "IX", Z80.patR8M, baseCodes));
-//
-//		baseCodes = new byte[] { (byte) 0XC6, (byte) 0X00 };
-//		subInstructions.put("ADC_3", new SubInstruction("ADC_3", 2, "A", Z80.patLIT_A, "IX", Z80.patEXP, baseCodes));
-//
-//		baseCodes = new byte[] { (byte) 0XC6, (byte) 0X00 };
-//		subInstructions.put("ADC_4",
-//				new SubInstruction("ADC_4", 2, "A", Z80.patLIT_HL, "SP", Z80.patR16_SP, baseCodes));
-
 		baseCodes = new byte[] { (byte) 0XD3, (byte) 0X00 };
 		subInstructions.put("OUT_2", new SubInstruction("OUT_2", Z80.EXP_ADDR, "A", baseCodes));
 
@@ -363,6 +329,80 @@ public class SubInstructionSet {
 
 		baseCodes = new byte[] { (byte) 0X20, (byte) 0X00 };
 		subInstructions.put("JR_1", new SubInstruction("JR_1", Z80.COND_LIMITED, Z80.EXP_DB, baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XDD, (byte) 0XCB, (byte) 0X00, (byte) 0X46 };
+		subInstructions.put("BIT_1", new SubInstruction("BIT_1", Z80.EXP_BIT, Z80.IND_XYd, baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XDD, (byte) 0XCB, (byte) 0X00, (byte) 0X86 };
+		subInstructions.put("RES_1", new SubInstruction("RES_1", Z80.EXP_BIT, Z80.IND_XYd, baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XDD, (byte) 0XCB, (byte) 0X00, (byte) 0XC6 };
+		subInstructions.put("SET_1", new SubInstruction("SET_1", Z80.EXP_BIT, Z80.IND_XYd, baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XCB, (byte) 0X40 };
+		subInstructions.put("BIT_2", new SubInstruction("BIT_2", Z80.EXP_BIT, Z80.R_MAIN, baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XCB, (byte) 0X80 };
+		subInstructions.put("RES_2", new SubInstruction("RES_2", Z80.EXP_BIT, Z80.R_MAIN, baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XCB, (byte) 0XC0 };
+		subInstructions.put("SET_2", new SubInstruction("SET_2", Z80.EXP_BIT, Z80.R_MAIN, baseCodes));
+
+		baseCodes = new byte[] { (byte) 0X02 };
+		subInstructions.put("LD_12", new SubInstruction("LD_12", Z80.IND_BCDE, Z80.LIT_A, baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XED, (byte) 0X41 };
+		subInstructions.put("OUT_1", new SubInstruction("OUT_1", Z80.IND_C, Z80.R_MAIN, baseCodes));
+
+		baseCodes = new byte[] { (byte) 0X70 };
+		subInstructions.put("LD_23", new SubInstruction("LD_23", Z80.IND_HL, Z80.R_MAIN, baseCodes));
+
+		baseCodes = new byte[] { (byte) 0X36, (byte) 0X00 };
+		subInstructions.put("LD_24", new SubInstruction("LD_24", Z80.IND_HL, Z80.EXP, baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XE3 };
+		subInstructions.put("EX_1", new SubInstruction("EX_1", Z80.IND_SP, Z80.LIT_HL, baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XDD, (byte) 0XE3 };
+		subInstructions.put("EX_2", new SubInstruction("EX_2", Z80.IND_SP, Z80.LIT_IXY, baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XDD, (byte) 0X70, (byte) 0X00 };
+		subInstructions.put("LD_13", new SubInstruction("LD_13", Z80.IND_XYd, Z80.R_MAIN, baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XDD, (byte) 0X36, (byte) 0X00, (byte) 0X00 };
+		subInstructions.put("LD_14", new SubInstruction("LD_14", Z80.IND_XYd, Z80.EXP, baseCodes));
+
+		// Two Arguments ...................................................
+		//////////////////////////////////////////////////////////////////////////////////////////////////////////
+		// ADC
+		baseCodes = new byte[] { (byte) 0XDD, (byte) 0X8E, (byte) 0X00 };
+		subInstructions.put("ADC_1", new SubInstruction("ADC_1", Z80.LIT_A, Z80.IND_XYd, baseCodes));
+
+		baseCodes = new byte[] { (byte) 0X88 };
+		subInstructions.put("ADC_2", new SubInstruction("ADC_2", Z80.LIT_A, Z80.R_MAIN, baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XCE, (byte) 0X00 };
+		subInstructions.put("ADC_3", new SubInstruction("ADC_3", Z80.LIT_A, Z80.EXP, baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XED, (byte) 0X4A };
+		subInstructions.put("ADC_4", new SubInstruction("ADC_4", Z80.LIT_HL, Z80.R16_SP, baseCodes));
+		// ADD
+		baseCodes = new byte[] { (byte) 0XDD, (byte) 0X86, (byte) 0X00 };
+		subInstructions.put("ADD_1", new SubInstruction("ADD_1", Z80.LIT_A, Z80.IND_XYd, baseCodes));
+
+		baseCodes = new byte[] { (byte) 0X80 };
+		subInstructions.put("ADD_2", new SubInstruction("ADD_2", Z80.LIT_A, Z80.R_MAIN, baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XC6, (byte) 0X00 };
+		subInstructions.put("ADD_3", new SubInstruction("ADD_3", Z80.LIT_A, Z80.EXP, baseCodes));
+
+		baseCodes = new byte[] { (byte) 0X09 };
+		subInstructions.put("ADD_4", new SubInstruction("ADD_4", Z80.LIT_HL, Z80.R16_SP, baseCodes));
+
+		baseCodes = new byte[] { (byte) 0XDD, (byte) 0X09 };
+		subInstructions.put("ADD_5", new SubInstruction("ADD_5", Z80.LIT_IXY, Z80.R16_IX, baseCodes));
+
+		//////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	}// appInit
 

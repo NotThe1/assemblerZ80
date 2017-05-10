@@ -19,7 +19,7 @@ public final class Z80 {
 
 	public static final String R_MAIN = "R_MAIN"; // used for all standard 8080 registers
 
-	public static final String R16_XY = "R16_XY";
+//	public static final String R16_XY = "R16_XY";
 	public static final String R16_SP = "R16_SP";
 	public static final String R16_IX = "R16_IX";
 	public static final String R8M = "R8M"; // basic 8 bit regisers including M
@@ -36,6 +36,9 @@ public final class Z80 {
 	
 	
 	public static final String LIT_A = "LIT_A";
+	public static final String LIT_AF = "LIT_AF";
+	public static final String LIT_AFp = "LIT_AFp";
+	public static final String LIT_DE = "LIT_DE";
 	public static final String LIT_HL = "LIT_HL";
 	public static final String LIT_IXY = "LIT_IXY";
 	
@@ -53,7 +56,7 @@ public final class Z80 {
 	public static final Pattern patR16_BCDE = Pattern.compile("BC|DE");
 	public static final Pattern patR16_AF = Pattern.compile("BC|DE|HL|AF");
 	public static final Pattern patR16_SP = Pattern.compile("BC,|DE,|HL,|SP,|BC|DE|HL|SP");
-	public static final Pattern patR16_IX = Pattern.compile("BC|DE|SP|IX");
+	public static final Pattern patR16_IX = Pattern.compile("BC|DE|SP|IX|IY");
 
 	public static final Pattern patLIT_A = Pattern.compile("A,|A");
 	public static final Pattern patLIT_AF = Pattern.compile("AF,");

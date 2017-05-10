@@ -25,6 +25,8 @@ import java.text.MessageFormat;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Observable;
+import java.util.Observer;
 import java.util.Queue;
 import java.util.Scanner;
 import java.util.prefs.Preferences;
@@ -61,7 +63,7 @@ import parser.Token;
 import parser.TokenType;
 import parser.Tokenizer;
 
-public class ASM {
+public class ASM implements Observer {
 
 	private AdapterForASM adapterForASM = new AdapterForASM();
 	private InstructionCounter instructionCounter = InstructionCounter.getInstance();
@@ -194,58 +196,265 @@ public class ASM {
 
 		switch (si.getInstruction()) {
 		case "ADC":
-			
+
 			if (si.argument1Type.equals(Z80.LIT_HL)) { // ADC_4
 				regByte = Z80.registerTable.get(argument2);
 				ans[1] = (byte) (ans[1] | regByte);
 			} else {// arg1 is LIT_A
-				if (si.argument2Type.equals(Z80.R_MAIN)) {	//ADC_2
+				if (si.argument2Type.equals(Z80.R_MAIN)) { // ADC_2
 					regByte = Z80.registerTable.get(argument2);
 					ans[0] = (byte) (ans[0] | regByte);
-				} else if (si.argument2Type.equals(Z80.IND_XYd)) {	//ADC_1
+				} else if (si.argument2Type.equals(Z80.IND_XYd)) { // ADC_1
 					if (argument2.startsWith("(IY")) {
 						ans[0] = (byte) 0XFD;
 					} // else use the stored value for IX
 					String exp = argument2.substring(4, argument2.length() - 1);
 					value = resolveExpression(exp, sourceLineParts.getLineNumber());
 					ans[2] = (byte) (ans[2] | value);
-				}else{		//ADC_3
+				} else { // ADC_3
 					value = resolveExpression(argument2, sourceLineParts.getLineNumber());
-					ans[1] = (byte) (ans[1] |  value);
-				}//inner else
+					ans[1] = (byte) (ans[1] | value);
+				} // inner else
 			} // outer if
 			break;
-			
 
 		case "ADD":
-			
 			if (si.argument1Type.equals(Z80.LIT_HL)) { // ADD_4
 				regByte = Z80.registerTable.get(argument2);
 				ans[0] = (byte) (ans[0] | regByte);
-			}else if (si.argument2Type.equals(Z80.R16_IX)){//ADD_5
-				if (argument1.startsWith("(IY")) {
+			} else if (si.argument2Type.equals(Z80.LIT_IXY)) {// ADD_5
+				if (argument1.equals("IY")) {
 					ans[0] = (byte) 0XFD;
 				} // else use the stored value for IX
 				regByte = Z80.registerTable.get(argument2);
-				ans[1] = (byte) (ans[1] | regByte);	
+				ans[1] = (byte) (ans[1] | regByte);
 			} else {// arg1 is LIT_A
-				if (si.argument2Type.equals(Z80.R_MAIN)) {	//ADD_2
+				if (si.argument2Type.equals(Z80.R_MAIN)) { // ADD_2
 					regByte = Z80.registerTable.get(argument2);
 					ans[0] = (byte) (ans[0] | regByte);
-				} else if (si.argument2Type.equals(Z80.IND_XYd)) {	//ADD_1
+				} else if (si.argument2Type.equals(Z80.IND_XYd)) { // ADD_1
 					if (argument2.startsWith("(IY")) {
 						ans[0] = (byte) 0XFD;
 					} // else use the stored value for IX
 					String exp = argument2.substring(4, argument2.length() - 1);
 					value = resolveExpression(exp, sourceLineParts.getLineNumber());
 					ans[2] = (byte) (ans[2] | value);
-				}else{		//ADC_3
+				} else { // ADC_3
 					value = resolveExpression(argument2, sourceLineParts.getLineNumber());
-					ans[1] = (byte) (ans[1] |  value);
-				}//inner else
+					ans[1] = (byte) (ans[1] | value);
+				} // inner else
 			} // outer if
 			break;
-			
+
+		case "AND":
+			if (si.argument1Type.equals(Z80.R_MAIN)) { // AND_2
+				regByte = Z80.registerTable.get(argument1);
+				ans[0] = (byte) (ans[0] | regByte);
+			} else if (si.argument1Type.equals(Z80.IND_XYd)) { // AND_1
+				if (argument1.startsWith("(IY")) {
+					ans[0] = (byte) 0XFD;
+				} // else use the stored value for IX
+				String exp = argument1.substring(4, argument1.length() - 1);
+				value = resolveExpression(exp, sourceLineParts.getLineNumber());
+				ans[2] = (byte) (ans[2] | value);
+			} else { // AND_3
+				value = resolveExpression(argument1, sourceLineParts.getLineNumber());
+				ans[1] = (byte) (ans[1] | value);
+			} // if
+			break;
+
+		case "BIT":
+			value = resolveExpression(argument1, sourceLineParts.getLineNumber());
+			Byte bitValue = Z80.bitTable.get(value);
+			if (bitValue == null) {
+				String msg = String.format("%s on Line %04d is an invalid argument, must resolve to 0 thru 7",
+						argument1, sourceLineParts.getLineNumber());
+				reportError(msg);
+				break;
+			} // if - value
+
+			if (si.argument2Type.equals(Z80.R_MAIN)) {// BIT_2
+				ans[1] = (byte) (ans[1] | (byte) bitValue);
+				value = resolveExpression(argument1, sourceLineParts.getLineNumber());
+				value = Z80.registerTable.get(argument2);
+				ans[1] = (byte) (ans[1] | value);
+			} else {// //BIT_1 IND_XYd
+				ans[3] = (byte) (ans[3] | (byte) bitValue);
+				if (argument2.startsWith("(IY")) {
+					ans[0] = (byte) 0XFD;
+				} // else use the stored value for IX
+				String exp = argument2.substring(4, argument2.length() - 1);
+				value = resolveExpression(exp, sourceLineParts.getLineNumber());
+				ans[2] = (byte) (ans[2] | value);
+			} // if
+			break;
+
+		case "CALL":
+			String target = argument1;
+			if (si.argument1Type.equals(Z80.COND)) {// CALL_1
+				byte c = Z80.conditionTable.get(argument1);
+				ans[0] = (byte) (ans[0] | c);
+				target = argument2;
+			} // if conditions
+				// Both CALL_1 and CALL_2
+			ans = resolveDW(ans, target, sourceLineParts.getLineNumber());
+			break;
+
+		case "CP":
+			if (si.argument1Type.equals(Z80.R_MAIN)) { // CP_2
+				regByte = Z80.registerTable.get(argument1);
+				ans[0] = (byte) (ans[0] | regByte);
+			} else if (si.argument1Type.equals(Z80.IND_XYd)) { // CP_1
+				if (argument1.startsWith("(IY")) {
+					ans[0] = (byte) 0XFD;
+				} // else use the stored value for IX
+				String exp = argument1.substring(4, argument1.length() - 1);
+				value = resolveExpression(exp, sourceLineParts.getLineNumber());
+				ans[2] = (byte) (ans[2] | value);
+			} else { // CP_3
+				value = resolveExpression(argument1, sourceLineParts.getLineNumber());
+				ans[1] = (byte) (ans[1] | value);
+			} // if
+			break;
+
+		case "DEC":
+		case "INC":
+			if (si.argument1Type.equals(Z80.IND_XYd)) {// DEC_1
+				if (argument1.startsWith("(IY")) {
+					ans[0] = (byte) 0XFD;
+				} // else use the stored value for IX
+				String exp = argument1.substring(4, argument1.length() - 1);
+				value = resolveExpression(exp, sourceLineParts.getLineNumber());
+				ans[2] = (byte) (ans[2] | (byte) value);
+			} else if (si.argument1Type.equals(Z80.LIT_IXY)) {// DEC_3
+				if (argument1.equals("IY")) {
+					ans[0] = (byte) 0XFD;
+				} // else use the stored value for IX
+			} else if (si.argument1Type.equals(Z80.R_MAIN)) {// DEC_2
+				regByte = Z80.registerTable.get(argument1);
+				ans[0] = (byte) (ans[0] | regByte);
+			} else {// DEC_4
+				regByte = Z80.registerTable.get(argument1);
+				regByte = (byte) (regByte << 3);
+				ans[0] = (byte) (ans[0] | regByte);
+			} // if
+
+			break;
+
+		case "DJNZ":
+			value = resolveExpression(argument1, sourceLineParts.getLineNumber());
+			ans[1] = (byte) (ans[1] | value);
+			break;
+
+		case "EX":
+			if (si.argument1Type.equals(Z80.IND_SP)) {
+				if (argument2.equals("IY")) {
+					ans[0] = (byte) 0XFD;
+				} // if use the stored value for IX
+					// both defaults are accurate otherwise
+			} // if not EX_1 or EX_2, Code is fixed for EX_3 & EX_4
+			break;
+
+		case "IM":
+			value = resolveExpression(argument1, sourceLineParts.getLineNumber());
+
+			if (value == 0) {
+				ans[1] = (byte) 0X46;
+			} else if (value == 1) {
+				ans[1] = (byte) 0X56;
+			} else if (value == 2) {
+				ans[1] = (byte) 0X5E;
+			} else {
+				String msg = String.format("%s on Line %04d is an invalid argument, must resolve to 0,1 or 2",
+						argument1, sourceLineParts.getLineNumber());
+				reportError(msg);
+			} // if
+			break;
+
+		case "IN":
+			if (si.argument2Type.equals(Z80.EXP_ADDR)) {// IN_2
+				value = resolveExpression(argument2, sourceLineParts.getLineNumber());
+				ans[1] = (byte) (ans[1] | (byte) value);
+			} else {// IN_1 and IN_3
+				regByte = Z80.registerTable.get(argument1);
+				regByte = (byte) (regByte << 3);
+				ans[1] = (byte) (ans[1] | (byte) regByte);
+			} // if
+			break;
+
+		case "JP":
+			if (si.argument1Type.equals(Z80.IND_HL)) {// JP_3
+				// no work here
+			} else if (si.argument1Type.equals(Z80.IND_XY)) {// JP_2
+				if (argument1.startsWith("(IY")) {
+					ans[0] = (byte) 0XFD;
+				} // else use the stored value for IX
+			} else if (si.argument1Type.equals(Z80.COND)) {// JP_1
+				regByte = Z80.conditionTable.get(argument1);
+				ans[0] = (byte) (ans[0] | regByte);
+				ans = resolveDW(ans, argument2, sourceLineParts.getLineNumber());
+			} else {// JP_4
+				ans = resolveDW(ans, argument1, sourceLineParts.getLineNumber());
+			} // if
+			break;
+
+		case "JR":
+			String relExpression = argument1;
+			if (si.argument1Type.equals(Z80.COND_LIMITED)) {// JR_1
+				regByte = Z80.conditionTable.get(argument1);
+				ans[0] = (byte) (ans[0] | regByte);
+				relExpression = argument2;
+			} // if
+				// Both JR_2 and JR_1
+			value = resolveExpression(relExpression, sourceLineParts.getLineNumber());
+			ans[1] = (byte) (ans[1] | (byte) value);
+			break;
+
+		case "LD":
+			switch (si.argument1Type) {
+
+			case Z80.IND_BCDE: // LD_12
+				if (argument1.equals("(DE)")) {
+					ans[0] = (byte) 0X12;
+				} // else is BC , use the default
+				break;
+
+			case Z80.IND_XYd: // LD_13, LD_14
+				if (argument1.startsWith("(IY")) {
+					ans[0] = (byte) 0XFD;
+				} // if use the stored value for IX
+
+				String exp = argument1.substring(4, argument1.length() - 1);
+				value = resolveExpression(exp, sourceLineParts.getLineNumber());
+				ans[2] = (byte) (ans[2] | (byte) value);
+				if (si.argument2Type.equals(Z80.R_MAIN)) {// LD_13
+					regByte = Z80.registerTable.get(argument2);
+					ans[1] = (byte) (ans[1] | regByte);
+				} else { // LD_14 expression
+					value = resolveExpression(argument2, sourceLineParts.getLineNumber());
+					ans[3] = (byte) (ans[3] | (byte) value);
+				} // if
+				break;
+
+			case Z80.IND_HL:
+				if (si.argument2Type.equals(Z80.R_MAIN)) {
+					regByte = Z80.registerTable.get(argument2);
+					ans[0] = (byte) (ans[0] | regByte);
+				} else { // Expression
+					value = resolveExpression(argument2, sourceLineParts.getLineNumber());
+					ans[1] = (byte) (ans[1] | (byte) value);
+				} // if
+				break;
+
+			case Z80.LIT_HL:
+				ans = resolveDW(ans, argument2, sourceLineParts.getLineNumber());
+				break;
+
+			default:
+			}// Inner switch
+			// ...........<><><><><><><>............
+
+			break;
 
 		default:
 
@@ -253,9 +462,11 @@ public class ASM {
 
 		return ans;
 	}// getActualCodes
-	
 
-		// <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
+	private void a() {
+
+	}
+	// <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 
 	private byte[] argCount0(SourceLineParts sourceLineParts) {
 		String subOpCode = sourceLineParts.getSubOpCode();
@@ -327,7 +538,7 @@ public class ASM {
 			ans[2] = (byte) (ans[2] | (byte) value);
 			break;
 
-		case Z80.R16_XY:
+		case Z80.LIT_IXY:
 			if (argument.equals("IY")) {
 				ans[0] = (byte) 0XFD;
 			} // else use the stored value for IX
@@ -450,11 +661,12 @@ public class ASM {
 				c = Z80.registerTable.get(argument2);
 				ans[1] = (byte) (ans[1] | c);
 			} else { // expression
-				value = resolveExpression(argument2, sourceLineParts.getLineNumber());
-				ans[3] = (byte) (ans[3] | value);
+				c = Z80.registerTable.get(argument1);
+				c = (byte) (c << 3);
+				ans[1] = (byte) (ans[1] | c);
 			} // if
-
 			break;
+
 		default:
 		}// switch arg 1
 
@@ -891,28 +1103,28 @@ public class ASM {
 			// txtListing.setText("");
 			asmSourceFile = chooserOpen.getSelectedFile();
 			prepareSourceFile(asmSourceFile);
-//			String asmSourceFileName = asmSourceFile.getName();
+			// String asmSourceFileName = asmSourceFile.getName();
 			// String asmSourceDirectory = asmSourceFile.getPath();
-//			String[] nameParts = (asmSourceFileName.split("\\."));
-//			sourceFileBase = nameParts[0];
-//			lblSourceFilePath.setText(asmSourceFile.getAbsolutePath());
-//			sourceFileFullName = asmSourceFile.getAbsolutePath();
-//			lblSourceFileName.setText(asmSourceFile.getName());
-//			lblListingFileName.setText(sourceFileBase + "." + SUFFIX_LISTING);
-//			defaultDirectory = asmSourceFile.getParent();
-//			outputPathAndBase = defaultDirectory + FILE_SEPARATOR + sourceFileBase;
-//
-//			// lblSource.setText(sourceFileName);
-//			// lblListing.setText(replaceWithListingFileName(sourceFileName));
-//			clearDoc(docSource);
-//			clearDoc(docListing);
-//			loadSourceFile(asmSourceFile, 1, null);
-//			tpSource.setCaretPosition(0);
-//			btnStart.setEnabled(true);
+			// String[] nameParts = (asmSourceFileName.split("\\."));
+			// sourceFileBase = nameParts[0];
+			// lblSourceFilePath.setText(asmSourceFile.getAbsolutePath());
+			// sourceFileFullName = asmSourceFile.getAbsolutePath();
+			// lblSourceFileName.setText(asmSourceFile.getName());
+			// lblListingFileName.setText(sourceFileBase + "." + SUFFIX_LISTING);
+			// defaultDirectory = asmSourceFile.getParent();
+			// outputPathAndBase = defaultDirectory + FILE_SEPARATOR + sourceFileBase;
+			//
+			// // lblSource.setText(sourceFileName);
+			// // lblListing.setText(replaceWithListingFileName(sourceFileName));
+			// clearDoc(docSource);
+			// clearDoc(docListing);
+			// loadSourceFile(asmSourceFile, 1, null);
+			// tpSource.setCaretPosition(0);
+			// btnStart.setEnabled(true);
 		} // if
 	}// openFile
-	
-	private void prepareSourceFile(File asmSourceFile){
+
+	private void prepareSourceFile(File asmSourceFile) {
 		String asmSourceFileName = asmSourceFile.getName();
 		// String asmSourceDirectory = asmSourceFile.getPath();
 		String[] nameParts = (asmSourceFileName.split("\\."));
@@ -931,12 +1143,12 @@ public class ASM {
 		loadSourceFile(asmSourceFile, 1, null);
 		tpSource.setCaretPosition(0);
 		btnStart.setEnabled(true);
-	}//prepareSourceFile
-	
-	private void doLoadLastFile(){
+	}// prepareSourceFile
+
+	private void doLoadLastFile() {
 		asmSourceFile = new File(sourceFileFullName);
 		prepareSourceFile(asmSourceFile);
-	}//doLoadLastFile
+	}// doLoadLastFile
 
 	private void clearDoc(StyledDocument doc) {
 		try {
@@ -1114,6 +1326,8 @@ public class ASM {
 
 		mnuFilePrintSource.setEnabled(false);
 		mnuFilePrintListing.setEnabled(false);
+
+		symbolTable.addObserver(this);
 		//
 		setAttributes();
 	}// appInit
@@ -1235,7 +1449,7 @@ public class ASM {
 		JButton btnLoadLastFile = new JButton("Load Last File");
 		btnLoadLastFile.setName(BTN_LOAD_LAST_FILE);
 		btnLoadLastFile.addActionListener(adapterForASM);
-		
+
 		GridBagConstraints gbc_btnLoadLastFile = new GridBagConstraints();
 		gbc_btnLoadLastFile.anchor = GridBagConstraints.NORTH;
 		gbc_btnLoadLastFile.insets = new Insets(0, 0, 0, 5);
@@ -1351,7 +1565,7 @@ public class ASM {
 			case START_BUTTON:
 				start();
 				break;
-				
+
 			case BTN_LOAD_LAST_FILE:
 				doLoadLastFile();
 			default:
@@ -1448,6 +1662,11 @@ public class ASM {
 	private JRadioButton rbHexFile;
 	private JMenuItem mnuFilePrintSource;
 	private JMenuItem mnuFilePrintListing;
+
+	@Override
+	public void update(Observable arg0, Object msg) {
+		reportError((String) msg);
+	}// update
 
 	// private static final String
 

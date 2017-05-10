@@ -205,7 +205,7 @@ Start:
 
 
 		CP		(IX + 10H)	; DD BE db
-		CP		(IY + 255)	; DD BE db
+		CP		(IY + 254)	; DD BE db
 
 		JP		(HL )		; E9
 		JP		( IX) 		; DD E9

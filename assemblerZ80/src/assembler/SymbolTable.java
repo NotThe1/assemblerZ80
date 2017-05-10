@@ -5,9 +5,11 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Observable;
 import java.util.Set;
 
-public class SymbolTable {
+public class SymbolTable extends Observable{
+	
 	private static SymbolTable instance = new SymbolTable();
 	
 	private HashMap<String, SymbolTableEntry> symbols;
@@ -72,8 +74,10 @@ public class SymbolTable {
 			entry.addReferenceLineNumber(lineNumber);
 			symbols.put(name, entry);
 		} else {
-			throw new AssemblerException(
-					"Attempting to reference an undefined symbol: " + name + " on line: " + lineNumber);
+			String error = String.format("Attempting to reference an undefined symbol: %s on line: %04d",
+					name, lineNumber);
+			this.setChanged();
+			this.notifyObservers(error);
 		} // if
 	}// referenceSymbol
 

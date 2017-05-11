@@ -296,7 +296,7 @@ public class InstructionSet {
 		branch = new OpCodeNode[] { new OpCodeNode(Z80.patLIT_A, Z80.BAD_OPCODE),
 				 new OpCodeNode(Z80.patIND_XYd, "LD_1"),
 				 new OpCodeNode(Z80.patIND_BCDE, "LD_2"),
-				 new OpCodeNode(Z80.patR8_RI, "LD_3"),
+				 new OpCodeNode(Z80.patLIT_RI, "LD_3"),
 				 new OpCodeNode(Z80.patR8M, "LD_4"),
 				 new OpCodeNode(Z80.patEXP_ADD, "LD_5"),
 				 new OpCodeNode(Z80.patEXP, "LD_6")};
@@ -321,10 +321,10 @@ public class InstructionSet {
 				 new OpCodeNode(Z80.patEXP, "LD_14")};
 		root.addBranch(branch);
 
-		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR8_RI, "LD_15")};
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patLIT_RI, "LD_15")};
 		root.addBranch(branch);
 		
-		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR16_SP, Z80.BAD_OPCODE),
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR16_BDH, Z80.BAD_OPCODE),
 				 new OpCodeNode(Z80.patEXP_ADD, "LD_16"),
 				 new OpCodeNode(Z80.patEXP, "LD_17")};
 		root.addBranch(branch);

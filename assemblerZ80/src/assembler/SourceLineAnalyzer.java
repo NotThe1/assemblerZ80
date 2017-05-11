@@ -7,6 +7,8 @@ public class SourceLineAnalyzer {
 
 	private SourceLineParts sourceLineParts;
 	private String originalLine;
+	InstructionSet is = InstructionSet.getInstance();
+	Pattern patternForInstruction = is.getPatternInstructions();
 
 	public SourceLineAnalyzer() {
 
@@ -102,8 +104,8 @@ public class SourceLineAnalyzer {
 
 	public String findInstruction(String workingLine) {
 		String netLine = new String(workingLine);
-		InstructionSet is = InstructionSet.getInstance();
-		Pattern patternForInstruction = is.getPatternInstructions();
+//		InstructionSet is = InstructionSet.getInstance();
+//		Pattern patternForInstruction = is.getPatternInstructions();
 		Matcher matcherForInstruction = patternForInstruction.matcher(netLine);
 		if (matcherForInstruction.lookingAt()) {
 			String instruction = matcherForInstruction.group();

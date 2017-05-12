@@ -86,6 +86,7 @@ public class ASM implements Observer {
 	private JScrollBar sbarListing;
 
 	private void start() {
+		lblStatus.setText(EMPTY_STRING);
 		instructionCounter.reset();
 		symbolTable.reset();
 		if (asmSourceFile == null) {
@@ -206,7 +207,7 @@ public class ASM implements Observer {
 
 		switch (si.getInstruction()) {
 		case "ADC":
-
+		case "SBC":
 			if (si.argument1Type.equals(Z80.LIT_HL)) { // ADC_4
 				regByte = Z80.registerTable.get(argument2);
 				ans[1] = (byte) (ans[1] | regByte);
@@ -255,8 +256,9 @@ public class ASM implements Observer {
 				} // inner else
 			} // outer if
 			break;
-
+		case "OR":
 		case "AND":
+		case "CP":
 			if (si.argument1Type.equals(Z80.R_MAIN)) { // AND_2
 				regByte = Z80.registerTable.get(argument1);
 				ans[0] = (byte) (ans[0] | regByte);
@@ -308,23 +310,6 @@ public class ASM implements Observer {
 			} // if conditions
 				// Both CALL_1 and CALL_2
 			ans = resolveDW(ans, target, sourceLineParts.getLineNumber());
-			break;
-
-		case "CP":
-			if (si.argument1Type.equals(Z80.R_MAIN)) { // CP_2
-				regByte = Z80.registerTable.get(argument1);
-				ans[0] = (byte) (ans[0] | regByte);
-			} else if (si.argument1Type.equals(Z80.IND_XYd)) { // CP_1
-				if (argument1.startsWith("(IY")) {
-					ans[0] = (byte) 0XFD;
-				} // else use the stored value for IX
-				String exp = argument1.substring(4, argument1.length() - 1);
-				value = resolveExpression(exp, sourceLineParts.getLineNumber());
-				ans[2] = (byte) (ans[2] | value);
-			} else { // CP_3
-				value = resolveExpression(argument1, sourceLineParts.getLineNumber());
-				ans[1] = (byte) (ans[1] | value);
-			} // if
 			break;
 
 		case "DEC":
@@ -546,32 +531,110 @@ public class ASM implements Observer {
 				} // if
 				break;
 
-			default:
+			default: // LD switch
+				break;
 			}// Inner switch
 				// ...........<><><><><><><>............
-		case "OR":
-			if (si.argument1Type.equals(Z80.R_MAIN)) { // OR_2
-				regByte = Z80.registerTable.get(argument1);
-				ans[0] = (byte) (ans[0] | regByte);
-			} else if (si.argument1Type.equals(Z80.IND_XYd)) { // OR_1
-				if (argument1.startsWith("(IY")) {
-					ans[0] = (byte) 0XFD;
-				} // else use the stored value for IX
-				String exp = argument1.substring(4, argument1.length() - 1);
-				value = resolveExpression(exp, sourceLineParts.getLineNumber());
-				ans[2] = (byte) (ans[2] | value);
-			} else { // OR_3
+			break;
+			
+			
+		case "OUT":
+			if (si.argument1Type.equals(Z80.IND_C)) {// OUT_1
+				if (argument2.equals("0")) {
+					argument2 = "M";
+				} // force
+				ans[1] = (byte) (ans[1] | getRegLeft3(argument2));
+			} else {// OUT_2
 				value = resolveExpression(argument1, sourceLineParts.getLineNumber());
 				ans[1] = (byte) (ans[1] | value);
 			} // if
 			break;
 
-		default:
+		case "POP":
+		case "PUSH":
+			if (si.argument1Type.equals(Z80.LIT_IXY)) {// PUSH_1,POP_1
+				if (argument1.equals("IY")) {
+					ans[0] = (byte) 0XFD;
+				} // else use the stored value for IX
+			} else {// PUSH_2,POP_2
+				regByte = Z80.registerTable.get(argument1);
+				ans[0] = (byte) (ans[0] | regByte);
+			} // if
+			break;
 
+		case "RES":
+			value = resolveExpression(argument1, sourceLineParts.getLineNumber());
+			bitValue = Z80.bitTable.get(value);
+			if (bitValue == null) {
+				String msg = String.format("%s on Line %04d is an invalid argument, must resolve to 0 thru 7",
+						argument1, sourceLineParts.getLineNumber());
+				reportError(msg);
+				break;
+			} // if - value
+
+			if (si.argument2Type.equals(Z80.R_MAIN)) { // RES_1
+				ans[1] = (byte) (ans[1] | (byte) bitValue);
+				regByte = Z80.registerTable.get(argument2);
+				ans[1] = (byte) (ans[1] | regByte);
+
+			} else { // RES_2
+				if (argument2.startsWith("(IY")) {
+					ans[0] = (byte) 0XFD;
+				} // if use the stored value for IX
+
+				String exp = argument2.substring(4, argument2.length() - 1);
+				value = resolveExpression(exp, sourceLineParts.getLineNumber());
+				ans[2] = (byte) (ans[2] | (byte) value);
+
+				ans[3] = (byte) (ans[3] | (byte) bitValue);
+			} // if argument 2 type
+			break;
+
+		case "RET":
+			if (si.argument1Type != null) {// RET_1
+				byte c = Z80.conditionTable.get(argument1);
+				ans[0] = (byte) (ans[0] | c);
+			} // if - do nothing if RET_2
+			break;
+
+		case "RL":
+		case "RLC":
+		case "RR":
+		case "RRC":
+			if (si.argument1Type.equals(Z80.IND_XYd)) { // RL_1
+				if (argument1.startsWith("(IY")) {
+					ans[0] = (byte) 0XFD;
+				} // else use the stored value for IX
+				String exp = argument1.substring(4, argument1.length() - 1);
+				value = resolveExpression(exp, sourceLineParts.getLineNumber());
+				ans[2] = (byte) (ans[2] | (byte) value);
+			} else { // RL_2
+				regByte = Z80.registerTable.get(argument1);
+				ans[1] = (byte) (ans[1] | regByte);
+			} // if
+			break;
+			
+		case "RST":
+			value = resolveExpression(argument1, sourceLineParts.getLineNumber());
+			if ((value > 56) | (value % 8 != 0)) {
+				String msg = String.format("%s on Line %04d is an invalid argument", argument1,
+						sourceLineParts.getLineNumber());
+				reportError(msg);
+				break;
+			} // if
+			ans[0] = (byte) (ans[0] | (byte) value);
+			break;
+
+		default: // major switch
 		}// switch Instruction
 
 		return ans;
 	}// getActualCodes
+
+	private byte getRegLeft3(String arg) {
+		byte regValue = Z80.registerTable.get(arg);
+		return (byte) (regValue << 3);
+	}// getRegLeft3
 
 	private void a() {
 
@@ -1376,7 +1439,8 @@ public class ASM implements Observer {
 		insertListing("*************" + System.lineSeparator(), attrRed);
 		insertListing(messsage + System.lineSeparator(), attrRed);
 		insertListing("*************" + System.lineSeparator(), attrRed);
-	}
+		lblStatus.setText(ERRORS);
+	}//reportError
 
 	private void setAttributes() {
 		StyleConstants.setForeground(attrNavy, new Color(0, 0, 128));
@@ -1610,11 +1674,19 @@ public class ASM implements Observer {
 		gbc_panelStatus.gridy = 1;
 		frmAsmAssembler.getContentPane().add(panelStatus, gbc_panelStatus);
 		GridBagLayout gbl_panelStatus = new GridBagLayout();
-		gbl_panelStatus.columnWidths = new int[] { 0 };
-		gbl_panelStatus.rowHeights = new int[] { 0 };
-		gbl_panelStatus.columnWeights = new double[] { Double.MIN_VALUE };
-		gbl_panelStatus.rowWeights = new double[] { Double.MIN_VALUE };
+		gbl_panelStatus.columnWidths = new int[] { 0, 0 };
+		gbl_panelStatus.rowHeights = new int[] { 0, 0 };
+		gbl_panelStatus.columnWeights = new double[] { 0.0, Double.MIN_VALUE };
+		gbl_panelStatus.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
 		panelStatus.setLayout(gbl_panelStatus);
+		
+		lblStatus = new JLabel("");
+		lblStatus.setForeground(Color.RED);
+		lblStatus.setFont(new Font("Tahoma", Font.PLAIN, 14));
+		GridBagConstraints gbc_lblStatus = new GridBagConstraints();
+		gbc_lblStatus.gridx = 0;
+		gbc_lblStatus.gridy = 0;
+		panelStatus.add(lblStatus, gbc_lblStatus);
 
 		menuBar = new JMenuBar();
 		frmAsmAssembler.setJMenuBar(menuBar);
@@ -1735,6 +1807,7 @@ public class ASM implements Observer {
 	private final static String SUFFIX_HEX = "hex";
 
 	private static final String EMPTY_STRING = ""; // empty string
+	private static final String ERRORS = "There are assembly errors"; // error message
 	private static final String SPACE = " "; // Space 0X20
 	private static final String COMMA = ","; // Comma ,
 	private static final String COLON = ":"; // Colon : ,
@@ -1772,6 +1845,7 @@ public class ASM implements Observer {
 	private JRadioButton rbHexFile;
 	private JMenuItem mnuFilePrintSource;
 	private JMenuItem mnuFilePrintListing;
+	private JLabel lblStatus;
 
 	@Override
 	public void update(Observable arg0, Object msg) {

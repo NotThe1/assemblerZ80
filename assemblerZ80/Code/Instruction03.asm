@@ -7,7 +7,7 @@ Value55AA	EQU	055AAH
 Start:
 
 ;LD_1
-		LD	A,(IX+7)	;DD 7E db
+		LD	A,(IX+07)	;DD 7E db
 		LD	A,(IY+17H)	;FD 7E db
 ;LD_2
 		LD	A,(BC)		; 0A

@@ -1,5 +1,5 @@
 ;Instruction04.asm
-; LD only
+; OR - RRC
 V55			EQU		055H
 Value55AA	EQU	055AAH
 

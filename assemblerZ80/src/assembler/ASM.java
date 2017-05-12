@@ -75,7 +75,7 @@ public class ASM implements Observer {
 	// private HashMap<String, Byte> conditionTable;
 
 	private String defaultDirectory;
-	private String outputPathAndBase;
+//	private String outputPathAndBase;
 	private File asmSourceFile = null;
 	private String sourceFileBase;
 	private String sourceFileFullName;
@@ -118,9 +118,6 @@ public class ASM implements Observer {
 		int hiAddress = ((((instructionCounter.getCurrentLocation() - 1) / SIXTEEN) + 2) * SIXTEEN) - 1;
 		ByteBuffer memoryImage = ByteBuffer.allocate(hiAddress + 1);
 
-		// System.out.printf("[passTwo] lowest location: %04X, highest Location: %04X%n",
-		// instructionCounter.getLowestLocationSet(), hiAddress);
-
 		instructionCounter.reset();
 		clearDoc(docListing);
 		int currentLocation;
@@ -138,8 +135,6 @@ public class ASM implements Observer {
 			} else if (sourceLineParts.hasDirective()) {
 				instructionImage = setMemoryBytesForDirective(sourceLineParts);
 			} // if
-				// System.out.printf("[passTwo] %04d %04X %s%n", lineParser.getLineNumber(),
-				// currentLocation, instructionImage);
 			makeListing(currentLocation, instructionImage, sourceLineParts);
 			if (!instructionImage.equals(EMPTY_STRING)) {
 				buildMemoryImage(currentLocation, instructionImage, memoryImage);
@@ -151,28 +146,25 @@ public class ASM implements Observer {
 		// makeMemoryFile(memoryImage);
 		return memoryImage;
 	}// passTwo
+	
+//	private byte[] argCount0(SourceLineParts sourceLineParts) {
+//		String subOpCode = sourceLineParts.getSubOpCode();
+//		return SubInstructionSet.getBaseCodes(subOpCode);
+//	}// argCount0
+
 
 	private String setMemoryBytesForInstruction(SourceLineParts sourceLineParts) {
 		// String instructionStr = EMPTY_STRING;
 		instructionCounter.incrementCurrentLocation(sourceLineParts.getOpCodeSize());
-
-		byte[] netCodes = getActualCodes(sourceLineParts);
+		
+		byte[] netCodes = null;
+		if(sourceLineParts.getArgumentCount()==0){
+			String subOpCode = sourceLineParts.getSubOpCode();
+			netCodes=SubInstructionSet.getBaseCodes(subOpCode);
+		}else{
+			netCodes = getActualCodes(sourceLineParts);
+		}
 		return getInstructionCode(netCodes);
-
-		// switch (sourceLineParts.getArgumentCount()) {
-		// case 0:
-		// netCodes = argCount0(sourceLineParts);
-		// break;
-		// case 1:
-		// netCodes = argCount1(sourceLineParts);
-		// break;
-		// case 2:
-		// netCodes = argCount2(sourceLineParts);
-		// break;
-		// default:
-		//
-		// }// switch - getArgumentCount()
-		// return getInstructionCode(netCodes);
 	}// setMemoryBytesForInstruction
 
 	private String getInstructionCode(byte[] baseCodes) {
@@ -199,9 +191,7 @@ public class ASM implements Observer {
 		}
 
 		String argument1 = sourceLineParts.getArgument1();
-		// argument1 = argument1.replaceAll("\\s", Z80.EMPTY_STRING);// remove all spaces
 		String argument2 = sourceLineParts.getArgument2();
-		// argument2 = argument1.replaceAll("\\s", Z80.EMPTY_STRING);// remove all spaces
 		byte regByte;
 		int value;
 
@@ -259,6 +249,8 @@ public class ASM implements Observer {
 		case "OR":
 		case "AND":
 		case "CP":
+		case "SUB":
+		case "XOR":
 			if (si.argument1Type.equals(Z80.R_MAIN)) { // AND_2
 				regByte = Z80.registerTable.get(argument1);
 				ans[0] = (byte) (ans[0] | regByte);
@@ -329,11 +321,8 @@ public class ASM implements Observer {
 				regByte = Z80.registerTable.get(argument1);
 				ans[0] = (byte) (ans[0] | regByte);
 			} else {// DEC_4
-				regByte = Z80.registerTable.get(argument1);
-				regByte = (byte) (regByte << 3);
-				ans[0] = (byte) (ans[0] | regByte);
+				ans[0] = (byte) (ans[0] | getRegLeft3(argument1));
 			} // if
-
 			break;
 
 		case "DJNZ":
@@ -352,7 +341,6 @@ public class ASM implements Observer {
 
 		case "IM":
 			value = resolveExpression(argument1, sourceLineParts.getLineNumber());
-
 			if (value == 0) {
 				ans[1] = (byte) 0X46;
 			} else if (value == 1) {
@@ -371,9 +359,7 @@ public class ASM implements Observer {
 				value = resolveExpression(argument2, sourceLineParts.getLineNumber());
 				ans[1] = (byte) (ans[1] | (byte) value);
 			} else {// IN_1 and IN_3
-				regByte = Z80.registerTable.get(argument1);
-				regByte = (byte) (regByte << 3);
-				ans[1] = (byte) (ans[1] | (byte) regByte);
+				ans[1] = (byte) (ans[1] | getRegLeft3(argument1));
 			} // if
 			break;
 
@@ -482,15 +468,12 @@ public class ASM implements Observer {
 				break;
 
 			case Z80.R81: // LD_20, LD_21,LD_22
-				regByte = Z80.registerTable.get(argument1);
-				regByte = (byte) (regByte << 3);
-
 				if (si.argument2Type.equals(Z80.R_MAIN)) {// LD_20
-					ans[0] = (byte) (ans[0] | regByte);
+					ans[0] = (byte) (ans[0] | getRegLeft3(argument1));
 					regByte = Z80.registerTable.get(argument2);
 					ans[0] = (byte) (ans[0] | regByte);
 				} else if (si.argument2Type.equals(Z80.IND_XYd)) { // LD_21
-					ans[1] = (byte) (ans[1] | regByte);
+					ans[1] = (byte) (ans[1] | getRegLeft3(argument1));
 					if (argument2.startsWith("(IY")) {
 						ans[0] = (byte) 0XFD;
 					} // else use the stored value for IX
@@ -498,7 +481,7 @@ public class ASM implements Observer {
 					value = resolveExpression(exp, sourceLineParts.getLineNumber());
 					ans[2] = (byte) (ans[2] | (byte) value);
 				} else { // LD_22
-					ans[0] = (byte) (ans[0] | regByte);
+					ans[0] = (byte) (ans[0] | getRegLeft3(argument1));
 					value = resolveExpression(argument2, sourceLineParts.getLineNumber());
 					ans[1] = (byte) (ans[1] | (byte) value);
 				} // if
@@ -536,8 +519,7 @@ public class ASM implements Observer {
 			}// Inner switch
 				// ...........<><><><><><><>............
 			break;
-			
-			
+					
 		case "OUT":
 			if (si.argument1Type.equals(Z80.IND_C)) {// OUT_1
 				if (argument2.equals("0")) {
@@ -563,6 +545,7 @@ public class ASM implements Observer {
 			break;
 
 		case "RES":
+		case "SET":
 			value = resolveExpression(argument1, sourceLineParts.getLineNumber());
 			bitValue = Z80.bitTable.get(value);
 			if (bitValue == null) {
@@ -601,6 +584,9 @@ public class ASM implements Observer {
 		case "RLC":
 		case "RR":
 		case "RRC":
+		case "SLA":
+		case "SRA":
+		case "SRL":
 			if (si.argument1Type.equals(Z80.IND_XYd)) { // RL_1
 				if (argument1.startsWith("(IY")) {
 					ans[0] = (byte) 0XFD;
@@ -636,215 +622,9 @@ public class ASM implements Observer {
 		return (byte) (regValue << 3);
 	}// getRegLeft3
 
-	private void a() {
-
-	}
 	// <><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><><>
 
-	private byte[] argCount0(SourceLineParts sourceLineParts) {
-		String subOpCode = sourceLineParts.getSubOpCode();
-		return SubInstructionSet.getBaseCodes(subOpCode);
-	}// argCount0
 
-	private byte[] argCount1(SourceLineParts sourceLineParts) {
-		String subOpCode = sourceLineParts.getSubOpCode();
-		SubInstruction si = SubInstructionSet.getSubInstruction(subOpCode);
-		byte ans[] = si.baseCodes.clone();
-		String argument = sourceLineParts.getArgument1();
-		argument = argument.replaceAll("\\s", Z80.EMPTY_STRING);// remove all spaces
-
-		switch (si.argument1Type) {
-		case Z80.COND:
-			byte c = Z80.conditionTable.get(argument);
-			ans[0] = (byte) (ans[0] | c);
-			break;
-		case Z80.EXP_IM:
-			int value = resolveExpression(argument, sourceLineParts.getLineNumber());
-
-			if (value == 0) {
-				ans[1] = (byte) 0X46;
-			} else if (value == 1) {
-				ans[1] = (byte) 0X56;
-			} else if (value == 2) {
-				ans[1] = (byte) 0X5E;
-			} else {
-				String msg = String.format("%s on Line %04d is an invalid argument, must resolve to 0,1 or 2", argument,
-						sourceLineParts.getLineNumber());
-				reportError(msg);
-			} // if
-			break;
-		case Z80.EXP_RST:
-			value = resolveExpression(argument, sourceLineParts.getLineNumber());
-			if ((value > 56) | (value % 8 != 0)) {
-				String msg = String.format("%s on Line %04d is an invalid argument", argument,
-						sourceLineParts.getLineNumber());
-				reportError(msg);
-				break;
-			} // if
-			ans[0] = (byte) (ans[0] | (byte) value);
-			break;
-		case Z80.EXP_DB:
-			value = resolveExpression(argument, sourceLineParts.getLineNumber());
-			ans[1] = (byte) (ans[1] | (byte) value);
-
-			break;
-		case Z80.EXP_DW:
-			ans = resolveDW(ans, argument, sourceLineParts.getLineNumber());
-			break;
-
-		case Z80.IND_HL:
-			// do nothing no figuring out
-			break;
-
-		case Z80.IND_XY:
-			if (argument.equals("(IY)")) {
-				ans[0] = (byte) 0XFD;
-			} // else use the stored value for IX
-			break;
-
-		case Z80.IND_XYd:
-			if (argument.startsWith("(IY")) {
-				ans[0] = (byte) 0XFD;
-			} // else use the stored value for IX
-			String exp = argument.substring(4, argument.length() - 1);
-			value = resolveExpression(exp, sourceLineParts.getLineNumber());
-			ans[2] = (byte) (ans[2] | (byte) value);
-			break;
-
-		case Z80.LIT_IXY:
-			if (argument.equals("IY")) {
-				ans[0] = (byte) 0XFD;
-			} // else use the stored value for IX
-			break;
-
-		case Z80.R8M_S3:
-			c = Z80.registerTable.get(argument);
-			c = (byte) (c << 3);
-			ans[0] = (byte) (ans[0] | c);
-			break;
-
-		case Z80.R_MAIN:
-			c = Z80.registerTable.get(argument);
-			int index = ans.length - 1;
-			ans[index] = (byte) (ans[index] | c);
-			break;
-
-		default:
-		}// switch - arg type
-		return ans;
-	}// argCount1
-
-	private byte[] argCount2(SourceLineParts sourceLineParts) {
-		int value;
-		String subOpCode = sourceLineParts.getSubOpCode();
-		SubInstruction si = SubInstructionSet.getSubInstruction(subOpCode);
-		byte ans[] = si.baseCodes.clone();
-		String argument1 = sourceLineParts.getArgument1();
-		String argument2 = sourceLineParts.getArgument2();
-		switch (si.argument1Type) {
-
-		case Z80.COND:
-			byte c = Z80.conditionTable.get(argument1);
-			ans[0] = (byte) (ans[0] | c);
-			ans = resolveDW(ans, argument2, sourceLineParts.getLineNumber());
-			break;
-
-		case Z80.COND_LIMITED:
-			c = Z80.conditionTable.get(argument1);
-			ans[0] = (byte) (ans[0] | c);
-			value = resolveExpression(argument2, sourceLineParts.getLineNumber());
-			ans[1] = (byte) (ans[1] | (byte) value);
-			break;
-
-		case Z80.EXP_ADDR:
-			value = resolveExpression(argument1, sourceLineParts.getLineNumber());
-			ans[1] = (byte) (ans[1] | (byte) value);
-			break;
-
-		case Z80.EXP_BIT:
-			value = resolveExpression(argument1, sourceLineParts.getLineNumber());
-			Byte bitValue = Z80.bitTable.get(value);
-			if (bitValue == null) {
-				String msg = String.format("%s on Line %04d is an invalid argument, must resolve to 0 thru 7",
-						argument1, sourceLineParts.getLineNumber());
-				reportError(msg);
-				break;
-			} // if - value
-
-			if (si.argument2Type.equals(Z80.R_MAIN)) {
-				ans[1] = (byte) (ans[1] | (byte) bitValue);
-				c = Z80.registerTable.get(argument2);
-				ans[1] = (byte) (ans[1] | c);
-
-			} else { // IND_XYd
-				if (argument2.startsWith("(IY")) {
-					ans[0] = (byte) 0XFD;
-				} // if use the stored value for IX
-
-				String exp = argument2.substring(4, argument2.length() - 1);
-				value = resolveExpression(exp, sourceLineParts.getLineNumber());
-				ans[2] = (byte) (ans[2] | (byte) value);
-
-				ans[3] = (byte) (ans[3] | (byte) bitValue);
-			} // if argument 2 type
-
-			break;
-
-		case Z80.IND_BCDE:
-			if (argument1.equals("(DE)")) {
-				ans[0] = (byte) 0X12;
-			} // else is BC , use the default
-			break;
-
-		case Z80.IND_C:
-			if (argument2.equals("0")) {
-				argument2 = "M";
-			} // force
-			c = Z80.registerTable.get(argument2);
-			c = (byte) (c << 3);
-			ans[1] = (byte) (ans[1] | c);
-			break;
-
-		case Z80.IND_HL:
-			if (si.argument2Type.equals(Z80.R_MAIN)) {
-				c = Z80.registerTable.get(argument2);
-				ans[0] = (byte) (ans[0] | c);
-			} else { // Expression
-				value = resolveExpression(argument2, sourceLineParts.getLineNumber());
-				ans[1] = (byte) (ans[1] | (byte) value);
-			} // if
-			break;
-
-		case Z80.IND_SP:
-			if (argument2.equals("IY")) {
-				ans[0] = (byte) 0XFD;
-			} // if use the stored value for IX
-				// both defaults are accurate otherwise
-			break;
-
-		case Z80.IND_XYd:
-			if (argument1.startsWith("(IY")) {
-				ans[0] = (byte) 0XFD;
-			} // if use the stored value for IX
-
-			String exp = argument1.substring(4, argument1.length() - 1);
-			value = resolveExpression(exp, sourceLineParts.getLineNumber());
-			ans[2] = (byte) (ans[2] | (byte) value);
-			if (si.argument2Type.equals(Z80.R_MAIN)) {
-				c = Z80.registerTable.get(argument2);
-				ans[1] = (byte) (ans[1] | c);
-			} else { // expression
-				c = Z80.registerTable.get(argument1);
-				c = (byte) (c << 3);
-				ans[1] = (byte) (ans[1] | c);
-			} // if
-			break;
-
-		default:
-		}// switch arg 1
-
-		return ans;
-	}// argCount2
 
 	private byte[] resolveDW(byte[] target, String argument, int lineNumber) {
 		byte[] work = target.clone();
@@ -1307,10 +1087,9 @@ public class ASM implements Observer {
 		lblSourceFileName.setText(asmSourceFile.getName());
 		lblListingFileName.setText(sourceFileBase + "." + SUFFIX_LISTING);
 		defaultDirectory = asmSourceFile.getParent();
-		outputPathAndBase = defaultDirectory + FILE_SEPARATOR + sourceFileBase;
+//		outputPathAndBase = defaultDirectory + FILE_SEPARATOR + sourceFileBase;
 
-		// lblSource.setText(sourceFileName);
-		// lblListing.setText(replaceWithListingFileName(sourceFileName));
+
 		clearDoc(docSource);
 		clearDoc(docListing);
 		loadSourceFile(asmSourceFile, 1, null);

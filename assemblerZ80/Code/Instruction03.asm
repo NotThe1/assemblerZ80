@@ -154,14 +154,14 @@ Start:
 		LD	H,(IY+15H)	;FD 66 db
 		LD	L,(IY+16H)	;FD 6E db
 ;LD_22
-		LD	B,V55		; 06
-		LD	C,V55		; 0D
-		LD	D,V55		; 16
-		LD	E,V55		; 1D
-		LD	H,V55		; 26
-		LD	L,V55		; 2D
-;		LD	M,V55		; 36
-		LD	(HL),V55		; 36
+		LD	B,V55		; 06 db
+		LD	C,V55		; 0E db
+		LD	D,V55		; 16 db
+		LD	E,V55		; 1E db
+		LD	H,V55		; 26 db
+		LD	L,V55		; 2E db
+;		LD	M,V55		; 36 db
+		LD	(HL),V55	; 3E db
 ;LD_23
 		LD	(HL),B		; 70
 		LD	(HL),C		; 71

@@ -86,6 +86,9 @@ public class SubInstructionSet {
 		baseCodes = new byte[] { (byte) 0X76 };
 		subInstructions.put("HLT_0", new SubInstruction("HLT_0", baseCodes));
 
+		baseCodes = new byte[] { (byte) 0X76 };
+		subInstructions.put("HALT_0", new SubInstruction("HALT_0", baseCodes));
+
 		baseCodes = new byte[] { (byte) 0XED, (byte) 0XAA };
 		subInstructions.put("IND_0", new SubInstruction("IND_0", baseCodes));
 
@@ -357,6 +360,18 @@ public class SubInstructionSet {
 
 		baseCodes = new byte[] { (byte) 0X36, (byte) 0X00 };
 		subInstructions.put("LD_24", new SubInstruction("LD_24", Z80.IND_HL, Z80.EXP, baseCodes));
+		
+		baseCodes = new byte[] { (byte) 0X32, (byte) 0X00 , (byte) 0X00 };
+		subInstructions.put("LD_25", new SubInstruction("LD_25", Z80.EXP_ADDR, Z80.LIT_A, baseCodes));
+		
+		baseCodes = new byte[] { (byte) 0XDD, (byte) 0X22 , (byte) 0X00 , (byte) 0X00 };
+		subInstructions.put("LD_26", new SubInstruction("LD_26", Z80.EXP_ADDR, Z80.LIT_IXY, baseCodes));
+		
+		baseCodes = new byte[] {  (byte) 0X22 , (byte) 0X00 , (byte) 0X00 };
+		subInstructions.put("LD_27", new SubInstruction("LD_26", Z80.EXP_ADDR, Z80.LIT_HL, baseCodes));
+		
+		baseCodes = new byte[] { (byte) 0XED, (byte) 0X43 , (byte) 0X00 , (byte) 0X00 };
+		subInstructions.put("LD_28", new SubInstruction("LD_28", Z80.EXP_ADDR, Z80.R16_SP, baseCodes));
 		// OR
 		baseCodes = new byte[] { (byte) 0XDD, (byte) 0XB6, (byte) 0X00 };
 		subInstructions.put("OR_1", new SubInstruction("OR_1", Z80.IND_XYd, baseCodes));

@@ -172,6 +172,18 @@ Start:
 		LD	(HL),A		; 77
 ;LD_24
 		LD	(HL),V55	; 36 db
+;LD_25
+		LD	(0ABCDH),A	; 32 lo hi
+;LD_26
+		LD	(0A5A5H),IX	; DD 22 lo hi
+		LD	(05A5AH),IY	; FD 22 lo hi
+;LD_27
+		LD	(1234H),HL	; 22 lo hi
+;LD_28
+		LD	(2345H),BC	; ED 43 lo hi
+		LD	(3456H),DE	; ED 53 lo hi
+		LD	(4567H),SP	; ED 73 lo hi
+
 
 			
 

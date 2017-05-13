@@ -149,7 +149,7 @@ public class InstructionSet {
 
 	private static void addNoArgInstructions() {
 		String ins;
-		String[] insSet = new String[] { "CCF", "CPD", "CPDR", "CPI", "CPIR", "CPL", "DAA", "DI", "EI", "EXX", "HLT",
+		String[] insSet = new String[] { "CCF", "CPD", "CPDR", "CPI", "CPIR", "CPL", "DAA", "DI", "EI", "EXX", "HLT","HALT",
 				"IND", "INDR", "INI", "INIR", "LDD", "LDDR", "LDI", "LDIR", "NEG", "NOP", "OTDR", "OTIR", "OUTD",
 				"OUTI", "RETI", "RETN", "RLA", "RLCA", "RLD", "RRA", "RRCA", "RRD", "SCF" };
 		for (int i = 0; i < insSet.length; i++) {
@@ -343,6 +343,13 @@ public class InstructionSet {
 		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_HL, Z80.BAD_OPCODE),
 				 new OpCodeNode(Z80.patR8M, "LD_23"),
 				 new OpCodeNode(Z80.patEXP, "LD_24")};
+		root.addBranch(branch);
+		
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patEXP_ADD1, Z80.BAD_OPCODE),
+				 new OpCodeNode(Z80.patLIT_A, "LD_25"),
+				 new OpCodeNode(Z80.patLIT_IXY, "LD_26"),
+				 new OpCodeNode(Z80.patLIT_HL, "LD_27"),
+				 new OpCodeNode(Z80.patR16_SP, "LD_28")};
 		root.addBranch(branch);
 
 

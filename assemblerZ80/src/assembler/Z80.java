@@ -16,6 +16,7 @@ public final class Z80 {
 	public static final String EXP_IM = "EXP_IM"; // used for IM -> 0,1,2
 	public static final String EXP_RST = "EXP_RST"; // used for RST -> 0H,8H,10H,18H,20H,28H,30H,38H
 	public static final String EXP_ADDR = "EXP_ADDR";
+	public static final String EXP_ADDR1 = "EXP_ADDR";
 
 	public static final String R_MAIN = "R_MAIN"; // used for all standard 8080 registers
 
@@ -85,6 +86,7 @@ public final class Z80 {
 	public static final Pattern patEXP = Pattern.compile(".*"); // last argument
 	public static final Pattern patEXP1 = Pattern.compile("[^,.]*,"); // first of 2 arguments
 	public static final Pattern patEXP_ADD = Pattern.compile("\\(.*\\)");
+	public static final Pattern patEXP_ADD1 = Pattern.compile("\\(.*\\),");
 	public static final Pattern patWord = Pattern.compile("\\b\\w*\\b");
 	public static final Pattern patNothing = Pattern.compile("^");
 

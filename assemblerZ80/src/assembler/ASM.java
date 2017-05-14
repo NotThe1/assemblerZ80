@@ -19,7 +19,9 @@ import java.awt.print.PrinterException;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.nio.ByteBuffer;
 import java.text.MessageFormat;
 import java.util.Date;
@@ -75,7 +77,7 @@ public class ASM implements Observer {
 	// private HashMap<String, Byte> conditionTable;
 
 	private String defaultDirectory;
-	// private String outputPathAndBase;
+	private String outputPathAndBase;
 	private File asmSourceFile = null;
 	private String sourceFileBase;
 	private String sourceFileFullName;
@@ -100,16 +102,38 @@ public class ASM implements Observer {
 
 		passOne(); // make symbol table & fix labels
 		ByteBuffer memoryImage = passTwo();
-		//
-		// if (rbListing.isSelected()) {
-		// saveListing();
-		// } // if listing
-		// if (rbMemFile.isSelected() || rbHexFile.isSelected()) {
-		// saveMemoryFile(memoryImage);
-		// } // if memory Image
-		// mnuFilePrintListing.setEnabled(true);
+
+		if (rbListing.isSelected()) {
+			saveListing();
+		} // if listing
+			// if (rbMemFile.isSelected() || rbHexFile.isSelected()) {
+			// saveMemoryFile(memoryImage);
+			// } // if memory Image
+			// mnuFilePrintListing.setEnabled(true);
 
 	}// start
+
+	private void saveListing() {
+		try {
+			FileWriter fw = new FileWriter(new File(outputPathAndBase + DOT + SUFFIX_LISTING));
+			PrintWriter pw = new PrintWriter(fw);
+			Scanner scanner = new Scanner(tpListing.getText());
+			String listingLine;
+			while (scanner.hasNextLine()) {
+				listingLine = scanner.nextLine();
+				listingLine = listingLine.replaceAll("\\s++$", EMPTY_STRING);
+				if (listingLine.equals(EMPTY_STRING)) {
+					continue; // skip
+				} // if empty line
+				pw.println(listingLine);
+			} // while
+			scanner.close();
+			pw.close();
+			fw.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} // try
+	}// saveListing
 
 	/**
 	 * passTwo makes final pass at source, using symbol table to generate the object code
@@ -146,7 +170,6 @@ public class ASM implements Observer {
 		// makeMemoryFile(memoryImage);
 		return memoryImage;
 	}// passTwo
-
 
 	private String setMemoryBytesForInstruction(SourceLineParts sourceLineParts) {
 		// String instructionStr = EMPTY_STRING;
@@ -1071,7 +1094,7 @@ public class ASM implements Observer {
 			// lblSourceFileName.setText(asmSourceFile.getName());
 			// lblListingFileName.setText(sourceFileBase + "." + SUFFIX_LISTING);
 			// defaultDirectory = asmSourceFile.getParent();
-			// outputPathAndBase = defaultDirectory + FILE_SEPARATOR + sourceFileBase;
+			outputPathAndBase = defaultDirectory + FILE_SEPARATOR + sourceFileBase;
 			//
 			// // lblSource.setText(sourceFileName);
 			// // lblListing.setText(replaceWithListingFileName(sourceFileName));
@@ -1093,7 +1116,7 @@ public class ASM implements Observer {
 		lblSourceFileName.setText(asmSourceFile.getName());
 		lblListingFileName.setText(sourceFileBase + "." + SUFFIX_LISTING);
 		defaultDirectory = asmSourceFile.getParent();
-		// outputPathAndBase = defaultDirectory + FILE_SEPARATOR + sourceFileBase;
+		 outputPathAndBase = defaultDirectory + FILE_SEPARATOR + sourceFileBase;
 
 		clearDoc(docSource);
 		clearDoc(docListing);

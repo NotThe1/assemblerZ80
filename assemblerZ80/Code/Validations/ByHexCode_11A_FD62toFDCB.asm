@@ -1,4 +1,4 @@
-;ByHexCodeFD62toFDCB.asm
+;ByHexCode_11A_FD62toFDCB.asm
 
 nnWord	EQU		01234H	; nn 
 aByte	EQU		5AH		; n
@@ -53,38 +53,38 @@ LFDB6:	OR (IY + dByte)
 XFDBC:	; CP IYH*
 XFDBD:	; CP IYL*
 LFDBE:	CP (IY + dByte)
-XFDCB: ; 00	LD B, RLC (IY + d)*
-XFDCB: ; 01	LD C, RLC (IY + d)*
-XFDCB: ; 02	LD D, RLC (IY + d)*
-XFDCB: ; 03	LD E, RLC (IY + d)*
-XFDCB: ; 04	LD H, RLC (IY + d)*
-XFDCB: ; 05	LD L, RLC (IY + d)*
+XFDCBdd00:  ; d 00	LD B, RLC (IY + d)*
+XFDCBdd01:  ; d 01	LD C, RLC (IY + d)*
+XFDCBdd02:  ; d 02	LD D, RLC (IY + d)*
+XFDCBdd03:  ; d 03	LD E, RLC (IY + d)*
+XFDCBdd04:  ; d 04	LD H, RLC (IY + d)*
+XFDCBdd05:  ; d 05	LD L, RLC (IY + d)*
 LFDCBdd06:	RLC (IY + dByte)
-XFDCB: ; d 07	LD A, RLC (IY + d)*
-XFDCB: ; d 08	LD B, RRC (IY + d)*
-XFDCB: ; d 09	LD C, RRC (IY + d)*
-XFDCB: ; d 0A	LD D, RRC (IY + d)*
-XFDCB: ; d 0B	LD E, RRC (IY + d)*
-XFDCB: ; d 0C	LD H, RRC (IY + d)*
-XFDCB: ; d 0D	LD L, RRC (IY + d)*
+XFDCBdd07:  ; d 07	LD A, RLC (IY + d)*
+XFDCBdd08:  ; d 08	LD B, RRC (IY + d)*
+XFDCBdd09:  ; d 09	LD C, RRC (IY + d)*
+XFDCBdd0A:  ; d 0A	LD D, RRC (IY + d)*
+XFDCBdd0B:  ; d 0B	LD E, RRC (IY + d)*
+XFDCBdd0C:  ; d 0C	LD H, RRC (IY + d)*
+XFDCBdd0D:  ; d 0D	LD L, RRC (IY + d)*
 LFDCBdd0E:	RRC (IY + dByte)
-XFDCB: ; d 0F	LD A, RRC (IY + d)*
-XFDCB: ; d 10	LD B, RL (IY + d)*
-XFDCB: ; d 11	LD C, RL (IY + d)*
-XFDCB: ; d 12	LD D, RL (IY + d)*
-XFDCB: ; d 13	LD E, RL (IY + d)*
-XFDCB: ; d 14	LD H, RL (IY + d)*
-XFDCB: ; d 15	LD L, RL (IY + d)*
+XFDCBdd0F:  ; d 0F	LD A, RRC (IY + d)*
+XFDCBdd10:  ; d 10	LD B, RL (IY + d)*
+XFDCBdd11:  ; d 11	LD C, RL (IY + d)*
+XFDCBdd12:  ; d 12	LD D, RL (IY + d)*
+XFDCBdd13:  ; d 13	LD E, RL (IY + d)*
+XFDCBdd14:  ; d 14	LD H, RL (IY + d)*
+XFDCBdd15:  ; d 15	LD L, RL (IY + d)*
 LFDCBdd16:	RL (IY + dByte)
-XFDCB: ; d 17	LD A, RL (IY + d)*
-XFDCB: ; d 18	LD B, RR (IY + d)*
-XFDCB: ; d 19	LD C, RR (IY + d)*
-XFDCB: ; d 1A	LD D, RR (IY + d)*
-XFDCB: ; d 1B	LD E, RR (IY + d)*
-XFDCB: ; d 1C	LD H, RR (IY + d)*
-XFDCB: ; d 1D	LD L, RR (IY + d)*
+XFDCBdd17:  ; d 17	LD A, RL (IY + d)*
+XFDCBdd18:  ; d 18	LD B, RR (IY + d)*
+XFDCBdd19:  ; d 19	LD C, RR (IY + d)*
+XFDCBdd1A:  ; d 1A	LD D, RR (IY + d)*
+XFDCBdd1B:  ; d 1B	LD E, RR (IY + d)*
+XFDCBdd1C:  ; d 1C	LD H, RR (IY + d)*
+XFDCBdd1D:  ; d 1D	LD L, RR (IY + d)*
 LFDCBdd1E:	RR (IY + dByte)
-XFDCB: ; d 1F	LD A, RR (IY + d)*
-XFDCB: ; d 20	LD B, SLA (IY + d)*
-XFDCB: ; d 21	LD C, SLA (IY + d)*
-XFDCB: ; d 22	LD D, SLA (IY + d)*
+XFDCBdd1F:  ; d 1F	LD A, RR (IY + d)*
+XFDCBdd20:  ; d 20	LD B, SLA (IY + d)*
+XFDCBdd21:  ; d 21	LD C, SLA (IY + d)*
+XFDCBdd22:  ; d 22	LD D, SLA (IY + d)*

@@ -50,9 +50,8 @@ public class SymbolTable extends Observable{
 			if (!pass1) {
 				return;
 			} //
-			String message = String.format("Duplicate definition of %s at line # %04d%n", name, lineNumber);
-			System.err.println(message);
-
+			String error = String.format("Duplicate definition of %s at line # %04d%n", name, lineNumber);
+			reportError(error);
 		} else { // new symbol
 			symbols.put(name, new SymbolTableEntry(name, value, lineNumber, symbolType));
 		} // if
@@ -76,8 +75,7 @@ public class SymbolTable extends Observable{
 		} else {
 			String error = String.format("Attempting to reference an undefined symbol: %s on line: %04d",
 					name, lineNumber);
-			this.setChanged();
-			this.notifyObservers(error);
+			reportError(error);
 		} // if
 	}// referenceSymbol
 
@@ -150,6 +148,12 @@ public class SymbolTable extends Observable{
 		} // if
 
 	}// getValue
+	
+	private void reportError(String error){
+		this.setChanged();
+		this.notifyObservers(error);	
+	}//reportError
+	
 		// ----------------------------------------------------------------------
 
 	public final static int LABEL = 0;

@@ -1,31 +1,31 @@
-;ByHexCodeDDCB2toED69.asm
+;ByHexCode_10_DDCB2toED69.asm
 
 nnWord	EQU		01234H	; nn 
 aByte	EQU		5AH		; n
 dByte	EQU		0DDH	; d
 ;    PC  ->	$
 
-XDDCB: ;d EB	LD E, SET 5, (IX + d)*
-XDDCB: ;d EC	LD H, SET 5, (IX + d)*
-XDDCB: ;d ED	LD L, SET 5, (IX + d)*
+XDDCBddEB:  ; d EB	LD E, SET 5, (IX + d)*
+XDDCBddEC:  ; d EC	LD H, SET 5, (IX + d)*
+XDDCBddED:  ; d ED	LD L, SET 5, (IX + d)*
 LDDCBddEE:	SET 5, (IX + dByte)
-XDDCB: ;d EF	LD A, SET 5, (IX + d)*
-XDDCB: ;d F0	LD B, SET 6, (IX + d)*
-XDDCB: ;d F1	LD C, SET 6, (IX + d)*
-XDDCB: ;d F2	LD D, SET 6, (IX + d)*
-XDDCB: ;d F3	LD E, SET 6, (IX + d)*
-XDDCB: ;d F4	LD H, SET 6, (IX + d)*
-XDDCB: ;d F5	LD L, SET 6, (IX + d)*
+XDDCBddEF:  ; d EF	LD A, SET 5, (IX + d)*
+XDDCBddF0:  ; d F0	LD B, SET 6, (IX + d)*
+XDDCBddF1:  ; d F1	LD C, SET 6, (IX + d)*
+XDDCBddF2:  ; d F2	LD D, SET 6, (IX + d)*
+XDDCBddF3:  ; d F3	LD E, SET 6, (IX + d)*
+XDDCBddF4:  ; d F4	LD H, SET 6, (IX + d)*
+XDDCBddF5:  ; d F5	LD L, SET 6, (IX + d)*
 LDDCBddF6:	SET 6, (IX + dByte)
-XDDCB: ;d F7	LD A, SET 6, (IX + d)*
-XDDCB: ;d F8	LD B, SET 7, (IX + d)*
-XDDCB: ;d F9	LD C, SET 7, (IX + d)*
-XDDCB: ;d FA	LD D, SET 7, (IX + d)*
-XDDCB: ;d FB	LD E, SET 7, (IX + d)*
-XDDCB: ;d FC	LD H, SET 7, (IX + d)*
-XDDCB: ;d FD	LD L, SET 7, (IX + d)*
+XDDCBddF7:  ; d F7	LD A, SET 6, (IX + d)*
+XDDCBddF8:  ; d F8	LD B, SET 7, (IX + d)*
+XDDCBddF9:  ; d F9	LD C, SET 7, (IX + d)*
+XDDCBddFA:  ; d FA	LD D, SET 7, (IX + d)*
+XDDCBddFB:  ; d FB	LD E, SET 7, (IX + d)*
+XDDCBddFC:  ; d FC	LD H, SET 7, (IX + d)*
+XDDCBddFD:  ; d FD	LD L, SET 7, (IX + d)*
 LDDCBddFE:	SET 7, (IX + dByte)
-XDDCB: ;d FF	LD A, SET 7, (IX + d)*
+XDDCBddFF:  ; d FF	LD A, SET 7, (IX + d)*
 
 LDDE1:	POP IX
 LDDE3:	EX (SP), IX

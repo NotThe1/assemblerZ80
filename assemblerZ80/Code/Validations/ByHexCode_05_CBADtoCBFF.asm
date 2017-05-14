@@ -1,4 +1,4 @@
-;ByHexCodeCBADtoCBFF.asm
+;ByHexCode_05_CBADtoCBFF.asm
 
 nnWord	EQU		01234H	; nn
 aByte	EQU		5AH		; n

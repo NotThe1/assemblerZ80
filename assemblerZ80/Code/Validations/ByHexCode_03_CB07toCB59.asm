@@ -1,4 +1,4 @@
-;ByHexCodeCB07toCB59.asm
+;ByHexCode_03_CB07toCB59.asm
 
 nnWord	EQU		01234H	; nn
 aByte	EQU		5AH		; n

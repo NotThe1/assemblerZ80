@@ -1,8 +1,9 @@
-;ByHexCode00to45.asm
+;ByHexCode_00_00to45.asm
 
 nnWord	EQU		01234H	; nn
 aByte	EQU		5AH		; n
 ;    PC  ->	$
+
 
 L00:	NOP
 L01:	LD BC, nnWord

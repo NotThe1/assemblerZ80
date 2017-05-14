@@ -1,4 +1,4 @@
-;ByHexCode46to8B.asm
+;ByHexCode_01_46to8B.asm
 
 nnWord	EQU		01234H	; nn
 aByte	EQU		5AH		; n

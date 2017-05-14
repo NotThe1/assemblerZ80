@@ -1,4 +1,4 @@
-;ByHexCode8CtoCB06.asm
+;ByHexCode_02_8CtoCB06.asm
 
 nnWord	EQU		01234H	; nn
 aByte	EQU		5AH		; n

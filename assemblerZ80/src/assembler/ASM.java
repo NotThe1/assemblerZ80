@@ -1021,7 +1021,7 @@ public class ASM implements Observer {
 				matcherInclude = patternForInclude.matcher(line);
 
 				if (matcherInclude.find()) {
-					String fileReference = line.substring(matcherInclude.end(), line.length());
+					String fileReference = line.substring(matcherInclude.end(), line.length()).trim();
 					lineNumber = doInclude(fileReference, sourceFile.getParentFile().getAbsolutePath(), lineNumber);
 				} // if
 			} // while
@@ -1029,7 +1029,9 @@ public class ASM implements Observer {
 			mnuFilePrintSource.setEnabled(true);
 			mnuFilePrintListing.setEnabled(false);
 		} catch (IOException e) {
-			e.printStackTrace();
+//			e.printStackTrace();
+			String error = String.format("File Not Found!! - %s", sourceFile.getAbsolutePath());
+			reportError(error);
 		} // TRY
 			// return lineNumber;
 		return lineNumber;

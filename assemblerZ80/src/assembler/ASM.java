@@ -344,7 +344,8 @@ public class ASM implements Observer {
 			break;
 
 		case "DJNZ":
-			value = resolveExpression(argument1, sourceLineParts.getLineNumber());
+//			value = resolveExpression(argument1, sourceLineParts.getLineNumber());
+			value = resolveRelativeValue(argument1, sourceLineParts.getLineNumber());
 			ans[1] = (byte) (ans[1] | value);
 			break;
 
@@ -405,7 +406,8 @@ public class ASM implements Observer {
 				relExpression = argument2;
 			} // if
 				// Both JR_2 and JR_1
-			value = resolveExpression(relExpression, sourceLineParts.getLineNumber());
+//			value = resolveExpression(relExpression, sourceLineParts.getLineNumber());
+			value = resolveRelativeValue(relExpression, sourceLineParts.getLineNumber());
 			ans[1] = (byte) (ans[1] | (byte) value);
 			break;
 
@@ -1029,7 +1031,7 @@ public class ASM implements Observer {
 			mnuFilePrintSource.setEnabled(true);
 			mnuFilePrintListing.setEnabled(false);
 		} catch (IOException e) {
-//			e.printStackTrace();
+			// e.printStackTrace();
 			String error = String.format("File Not Found!! - %s", sourceFile.getAbsolutePath());
 			reportError(error);
 		} // TRY
@@ -1118,7 +1120,7 @@ public class ASM implements Observer {
 		lblSourceFileName.setText(asmSourceFile.getName());
 		lblListingFileName.setText(sourceFileBase + "." + SUFFIX_LISTING);
 		defaultDirectory = asmSourceFile.getParent();
-		 outputPathAndBase = defaultDirectory + FILE_SEPARATOR + sourceFileBase;
+		outputPathAndBase = defaultDirectory + FILE_SEPARATOR + sourceFileBase;
 
 		clearDoc(docSource);
 		clearDoc(docListing);
@@ -1195,6 +1197,21 @@ public class ASM implements Observer {
 
 		return (ans != null) ? ans & 0XFFFF : 0; // max value is 64K
 	}// resolveSimpleArgument
+
+	private Integer resolveRelativeValue(String argument, Integer lineNumber) {
+		Integer ans = null;
+		 
+		if (symbolTable.contains(argument) && symbolTable.getType(argument) == SymbolTable.LABEL) {
+			int nextInstructionLocation = symbolTable.getValue("$") + 2;
+			int symbolValue = symbolTable.getValue(argument);
+			symbolTable.referenceSymbol(argument, lineNumber);
+			ans = symbolValue - nextInstructionLocation;
+		} else {
+			ans = resolveExpression(argument, lineNumber);
+		}
+		return ans;
+
+	}// resolveRelativeValue
 
 	private Integer resolveExpression(String arguments, Integer lineNumber) {
 		Integer answer = null;

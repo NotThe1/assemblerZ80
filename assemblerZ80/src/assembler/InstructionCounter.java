@@ -3,6 +3,8 @@ package assembler;
 public class InstructionCounter {
 	
 	private static InstructionCounter instance = new InstructionCounter();
+	
+	private AppLogger appLogger = AppLogger.getInstance();
 
 	int currentSegment;
 	String[] segmentNames = { "ASEG", "CSEG", "DSEG" };
@@ -81,7 +83,8 @@ public class InstructionCounter {
 				String errMessage = String.format(
 						"error in segemnt %s at location %04X",
 						segmentNames[currentSegment], currentLocation);
-				System.err.println(errMessage);
+				appLogger.addError(errMessage);
+//				System.err.println(errMessage);
 			}// if error!
 		}// if INPAGE
 		lowestLocationSet = Math.min(location[currentSegment], lowestLocationSet);

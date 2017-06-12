@@ -23,12 +23,12 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.text.MessageFormat;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Observable;
-import java.util.Observer;
 import java.util.Queue;
 import java.util.Scanner;
 import java.util.prefs.Preferences;
@@ -53,7 +53,6 @@ import javax.swing.SwingConstants;
 import javax.swing.border.BevelBorder;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.SimpleAttributeSet;
-import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
 
 import parser.EvaluationException;
@@ -65,13 +64,14 @@ import parser.Token;
 import parser.TokenType;
 import parser.Tokenizer;
 
-public class ASM implements Observer {
+public class ASM  {//implements Observer
 
 	private AdapterForASM adapterForASM = new AdapterForASM();
 	private InstructionCounter instructionCounter = InstructionCounter.getInstance();
 	private SymbolTable symbolTable = SymbolTable.getInstance();
 	private Parser parser = new Parser();
 	private Tokenizer tokenizer = new Tokenizer();
+	private AppLogger appLogger = AppLogger.getInstance();
 
 	private Queue<SourceLineParts> allLineParts;
 	// private HashMap<String, Byte> conditionTable;
@@ -87,7 +87,7 @@ public class ASM implements Observer {
 	private JScrollBar sbarSource;
 	private JScrollBar sbarListing;
 
-	private void start() {
+	private void doStart() {
 		lblStatus.setText(EMPTY_STRING);
 		instructionCounter.reset();
 		symbolTable.reset();
@@ -106,10 +106,10 @@ public class ASM implements Observer {
 		if (rbListing.isSelected()) {
 			saveListing();
 		} // if listing
-			// if (rbMemFile.isSelected() || rbHexFile.isSelected()) {
-			// saveMemoryFile(memoryImage);
-			// } // if memory Image
-			// mnuFilePrintListing.setEnabled(true);
+		if (rbMemFile.isSelected() || rbHexFile.isSelected()) {
+			saveMemoryFile(memoryImage);
+		} // if memory Image
+		mnuFilePrintListing.setEnabled(true);
 
 	}// start
 
@@ -134,16 +134,66 @@ public class ASM implements Observer {
 			e.printStackTrace();
 		} // try
 	}// saveListing
+	
+	private void saveMemoryFile(ByteBuffer memoryImage) {
+		int startAddress = instructionCounter.getLowestLocationSet() & 0XFFF0;
+		byte[] memImage = new byte[memoryImage.capacity() - startAddress];
+		memoryImage.position(startAddress);
+		memoryImage.get(memImage);
+
+		FileWriter fwMemFile = null;
+		PrintWriter pwMemFile = null;
+		FileWriter fwHexFile = null;
+		PrintWriter pwHexFile = null;
+		String memFile = outputPathAndBase + DOT + SUFFIX_MEM;
+		String hexFile = outputPathAndBase + DOT + SUFFIX_HEX;
+		try {
+
+			Files.deleteIfExists(Paths.get(memFile));
+			Files.deleteIfExists(Paths.get(hexFile));
+
+			if (rbMemFile.isSelected()) {
+				fwMemFile = new FileWriter(new File(memFile));
+				pwMemFile = new PrintWriter(fwMemFile);
+
+				MemFormatter memFormatter = MemFormatter.memFormatterFactory(startAddress, memImage);
+				while (memFormatter.hasNext()) {
+					pwMemFile.print((memFormatter.getNext()));
+				} // while Mem File
+				pwMemFile.close();
+				fwMemFile.close();
+			} // if Mem
+
+			if (rbHexFile.isSelected()) {
+				fwHexFile = new FileWriter(new File(hexFile));
+				pwHexFile = new PrintWriter(fwHexFile);
+
+				HexFormatter hexFormatter = new HexFormatter(startAddress, memImage);
+				while (hexFormatter.hasNext()) {
+					pwHexFile.println(hexFormatter.getNext());
+				} // while Hex File
+				pwHexFile.println(hexFormatter.getEOF());
+				pwHexFile.close();
+				fwHexFile.close();
+			} // if Hex
+
+		} catch (IOException e) {
+			e.printStackTrace();
+		} // try
+
+	}// saveMemoryFile
+
 
 	/**
 	 * passTwo makes final pass at source, using symbol table to generate the object code
 	 */
 	private ByteBuffer passTwo() {
-		int hiAddress = ((((instructionCounter.getCurrentLocation() - 1) / SIXTEEN) + 2) * SIXTEEN) - 1;
+//		int hiAddress = ((((instructionCounter.getCurrentLocation() - 1) / SIXTEEN) + 2) * SIXTEEN) - 1;
+		int hiAddress = (instructionCounter.getCurrentLocation() - 1) | 0X0F;
 		ByteBuffer memoryImage = ByteBuffer.allocate(hiAddress + 1);
 
 		instructionCounter.reset();
-		clearDoc(docListing);
+//		clearDoc(docListing);
 		int currentLocation;
 		String instructionImage;
 		SourceLineParts sourceLineParts;
@@ -344,7 +394,7 @@ public class ASM implements Observer {
 			break;
 
 		case "DJNZ":
-//			value = resolveExpression(argument1, sourceLineParts.getLineNumber());
+			// value = resolveExpression(argument1, sourceLineParts.getLineNumber());
 			value = resolveRelativeValue(argument1, sourceLineParts.getLineNumber());
 			ans[1] = (byte) (ans[1] | value);
 			break;
@@ -406,7 +456,7 @@ public class ASM implements Observer {
 				relExpression = argument2;
 			} // if
 				// Both JR_2 and JR_1
-//			value = resolveExpression(relExpression, sourceLineParts.getLineNumber());
+			// value = resolveExpression(relExpression, sourceLineParts.getLineNumber());
 			value = resolveRelativeValue(relExpression, sourceLineParts.getLineNumber());
 			ans[1] = (byte) (ans[1] | (byte) value);
 			break;
@@ -748,18 +798,15 @@ public class ASM implements Observer {
 	}// setMemoryBytesForDirective
 
 	private void buildMemoryImage(int pc, String lineImage, ByteBuffer memoryImage0) {
-
-		int numOfChars = lineImage.length() / 2;
-		if (numOfChars < 1) {
-			return;
-		} // if - nothing here
-		String strValue;
+		
 		int intValue;
-		for (int i = 0; i < numOfChars; i++) {
-			strValue = lineImage.substring(i * 2, (i + 1) * 2);
-			intValue = Integer.valueOf(strValue.trim(), 16);
+		String[] parts = lineImage.trim().split("\\s");
+		for (int i = 0; i < parts.length;i++){
+			intValue = Integer.valueOf(parts[i], 16);
 			memoryImage0.put((Integer) pc + i, (byte) intValue);
-		}
+		}//for
+		
+		
 	}// saveMemoryImage
 
 	private void makeXrefListing() {
@@ -839,6 +886,8 @@ public class ASM implements Observer {
 	 * passOne sets up the symbol table with initial value for Labels & symbols
 	 */
 	private void passOne() {
+		clearDoc(docListing);
+
 		int lineNumber;
 		String sourceLine;
 		// LineParser lineParser = new LineParser();
@@ -1200,7 +1249,7 @@ public class ASM implements Observer {
 
 	private Integer resolveRelativeValue(String argument, Integer lineNumber) {
 		Integer ans = null;
-		 
+
 		if (symbolTable.contains(argument) && symbolTable.getType(argument) == SymbolTable.LABEL) {
 			int nextInstructionLocation = symbolTable.getValue("$") + 2;
 			int symbolValue = symbolTable.getValue(argument);
@@ -1262,22 +1311,24 @@ public class ASM implements Observer {
 	}// main
 
 	private void reportError(String messsage) {
-		insertListing("*************" + System.lineSeparator(), attrRed);
-		insertListing(messsage + System.lineSeparator(), attrRed);
-		insertListing("*************" + System.lineSeparator(), attrRed);
-		lblStatus.setText(ERRORS);
+		String asterisks = "*************";
+		appLogger.addError(asterisks,messsage,asterisks);
+//		insertListing("*************" + System.lineSeparator(), attrRed); 
+//		insertListing(messsage + System.lineSeparator(), attrRed);
+//		insertListing("*************" + System.lineSeparator(), attrRed);
+//		lblStatus.setText(ERRORS);
 	}// reportError
 
 	private void setAttributes() {
-		StyleConstants.setForeground(attrNavy, new Color(0, 0, 128));
-		StyleConstants.setForeground(attrBlack, new Color(0, 0, 0));
-		StyleConstants.setForeground(attrBlue, new Color(0, 0, 255));
-		StyleConstants.setForeground(attrGreen, new Color(0, 128, 0));
-		StyleConstants.setForeground(attrTeal, new Color(0, 128, 128));
-		StyleConstants.setForeground(attrGray, new Color(128, 128, 128));
-		StyleConstants.setForeground(attrSilver, new Color(192, 192, 192));
-		StyleConstants.setForeground(attrRed, new Color(255, 0, 0));
-		StyleConstants.setForeground(attrMaroon, new Color(128, 0, 0));
+//		StyleConstants.setForeground(attrNavy, new Color(0, 0, 128));
+//		StyleConstants.setForeground(attrBlack, new Color(0, 0, 0));
+//		StyleConstants.setForeground(attrBlue, new Color(0, 0, 255));
+//		StyleConstants.setForeground(attrGreen, new Color(0, 128, 0));
+//		StyleConstants.setForeground(attrTeal, new Color(0, 128, 128));
+//		StyleConstants.setForeground(attrGray, new Color(128, 128, 128));
+//		StyleConstants.setForeground(attrSilver, new Color(192, 192, 192));
+//		StyleConstants.setForeground(attrRed, new Color(255, 0, 0));
+//		StyleConstants.setForeground(attrMaroon, new Color(128, 0, 0));
 	}// setAttributes
 
 	private void appClose() {
@@ -1320,6 +1371,7 @@ public class ASM implements Observer {
 		sbarSource.addAdjustmentListener(adapterForASM);
 
 		docListing = tpListing.getStyledDocument();
+		appLogger.setDoc(docListing);
 		sbarListing = spListing.getVerticalScrollBar();
 		sbarListing.setName(SBAR_LISTING);
 		sbarListing.addAdjustmentListener(adapterForASM);
@@ -1327,9 +1379,9 @@ public class ASM implements Observer {
 		mnuFilePrintSource.setEnabled(false);
 		mnuFilePrintListing.setEnabled(false);
 
-		symbolTable.addObserver(this);
+//		symbolTable.addObserver(this);
 		//
-		setAttributes();
+//		setAttributes();
 	}// appInit
 
 	public ASM() {
@@ -1571,7 +1623,7 @@ public class ASM implements Observer {
 
 			// buttons
 			case START_BUTTON:
-				start();
+				doStart();
 				break;
 
 			case BTN_LOAD_LAST_FILE:
@@ -1647,10 +1699,6 @@ public class ASM implements Observer {
 	private static final String decimalValuePattern = "[0-9]{1,4}D?+";
 	private static final String stringValuePattern = "\\A'.*'\\z"; // used for
 
-	// private static final String r8r8Pattern = "[ABCDEHLM],[ABCDEHLM]";
-	// private static final String r16dPattern = "B|BC|D|DE|H|HL|SP";
-	// private static final String r8Pattern = "A|B|C|D|E|H|L|M";
-
 	private static final int SIXTEEN = 16; // 0X10
 
 	private SimpleAttributeSet attrBlack = new SimpleAttributeSet();
@@ -1673,10 +1721,7 @@ public class ASM implements Observer {
 	private JMenuItem mnuFilePrintListing;
 	private JLabel lblStatus;
 
-	@Override
-	public void update(Observable arg0, Object msg) {
-		reportError((String) msg);
-	}// update
+
 
 	// private static final String
 

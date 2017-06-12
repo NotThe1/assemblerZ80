@@ -5,10 +5,9 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Observable;
 import java.util.Set;
 
-public class SymbolTable extends Observable{
+public class SymbolTable{
 	
 	private static SymbolTable instance = new SymbolTable();
 	
@@ -17,6 +16,7 @@ public class SymbolTable extends Observable{
 	private SymbolTableEntry entry;
 	private static boolean pass1 = true; // used to control two pass assembler
 	private InstructionCounter instructionCounter;
+	private AppLogger appLogger = AppLogger.getInstance();
 	
 	public static SymbolTable getInstance(){
 		return instance;
@@ -29,11 +29,11 @@ public class SymbolTable extends Observable{
 		// pass1 = true;
 	}// SymbolTable
 
-	public SymbolTable(InstructionCounter ic) {
-		symbols = new HashMap<String, SymbolTableEntry>();
-		this.instructionCounter = ic;
-		// pass1 = true;
-	}// SymbolTable
+//	public SymbolTable(InstructionCounter ic) {
+//		symbols = new HashMap<String, SymbolTableEntry>();
+//		this.instructionCounter = ic;
+//		// pass1 = true;
+//	}// SymbolTable
 
 	public void reset() {
 		symbols.clear();
@@ -49,9 +49,9 @@ public class SymbolTable extends Observable{
 			// TODO - account for SET
 			if (!pass1) {
 				return;
-			} //
+			} //if
 			String error = String.format("Duplicate definition of %s at line # %04d%n", name, lineNumber);
-			reportError(error);
+			appLogger.addError(error);
 		} else { // new symbol
 			symbols.put(name, new SymbolTableEntry(name, value, lineNumber, symbolType));
 		} // if
@@ -75,7 +75,7 @@ public class SymbolTable extends Observable{
 		} else {
 			String error = String.format("Attempting to reference an undefined symbol: %s on line: %04d",
 					name, lineNumber);
-			reportError(error);
+			appLogger.addError(error);
 		} // if
 	}// referenceSymbol
 
@@ -142,18 +142,13 @@ public class SymbolTable extends Observable{
 			try {
 				return symbols.get(name).getValue();
 			} catch (NullPointerException npe) {
-				System.err.printf("Bad symbol: %s%n", name);
+				appLogger.addError(String.format("Bad symbol: %s%n", name));
 				return 0;
 			} // try
 		} // if
 
 	}// getValue
-	
-	private void reportError(String error){
-		this.setChanged();
-		this.notifyObservers(error);	
-	}//reportError
-	
+		
 		// ----------------------------------------------------------------------
 
 	public final static int LABEL = 0;

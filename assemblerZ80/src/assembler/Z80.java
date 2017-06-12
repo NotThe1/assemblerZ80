@@ -81,8 +81,10 @@ public final class Z80 {
 	public static final Pattern patIND_XYd1 = Pattern.compile("\\(I[X|Y]\\+.*\\),"); // first of 2 arguments
 
 //	public static final Pattern patR8 = Pattern.compile("[A|B|C|D|E|H|L],|[A|B|C|D|E|H|L]\\b");
-	public static final Pattern patCOND = Pattern.compile("[C|M|NC|NZ|P|PE|PO|Z],|[C|M|NC|NZ|P|PE|PO|Z]\\b");
+//	public static final Pattern patCOND = Pattern.compile("[C|M|NC|NZ|P|PE|PO|Z],|[C|M|NC|NZ|P|PE|PO|Z]\\b");
 //	public static final Pattern patCOND = Pattern.compile("C,|M,|NC,|NZ,|P,|PE,|PO,|Z,|C|M|NC|NZ|P|PE|PO|Z");
+	public static final Pattern patCOND = Pattern.compile("C,|M,|NC,|NZ,|P,|PE,|PO,|Z,|C\\b|M\\b|NC\\b|NZ\\b|P\\b|PE\\b|PO|Z\\b");
+
 	public static final Pattern patCONDs = Pattern.compile("C,|NC,|NZ,|Z,"); // some conditions
 
 	public static final Pattern patEXP = Pattern.compile(".*"); // last argument

@@ -50,8 +50,11 @@ public class InstructionSet {
 
 	private String getSubCode(OpCodeNode node, String source) {
 		String ans = null;
+		try{
 		matcher = node.getPattern().matcher(source);
-
+		}catch (NullPointerException npe){
+			AppLogger.getInstance().addError(source);
+		}
 		if (!matcher.lookingAt()) {
 			return ans;
 		} // if not interested in this node!
@@ -142,6 +145,7 @@ public class InstructionSet {
 		instructions.put("XOR", rootXOR());
 
 		addNoArgInstructions();
+		
 
 		patternInstructions = Pattern.compile(getRegex());
 
@@ -158,6 +162,8 @@ public class InstructionSet {
 		} // for
 
 	}// addNoArgInstructions
+	
+
 
 	private static OpCodeNode rootNoArgs(String instruction) {
 		root = new OpCodeNode(Z80.patWord, instruction + "_0");

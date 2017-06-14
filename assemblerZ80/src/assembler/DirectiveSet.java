@@ -54,7 +54,9 @@ public class DirectiveSet {
 		directives.put("EQU", new Directive("EQU", true, 1, false));
 		directives.put("SET", new Directive("SET", true, 1, false));
 		directives.put("DB", new Directive("DB", false, 8, true));
+//		directives.put(".DB", new Directive(".DB", false, 8, true));
 		directives.put("DW", new Directive("DW", false, 8, true));
+//		directives.put(".DW", new Directive(".DW", false, 8, true));
 		directives.put("DS", new Directive("DS", false, 1, false));
 
 		directives.put("IF", new Directive("IF", false, 1, false));

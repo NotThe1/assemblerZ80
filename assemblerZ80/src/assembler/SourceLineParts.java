@@ -22,6 +22,7 @@ public class SourceLineParts {
 			this.lineNumber = lineNumber;
 		} // if
 	}// setLineNumber
+	
 
 	public void setOpCodeSize(Integer opCodeSize) {
 		if (opCodeSize > 0) {

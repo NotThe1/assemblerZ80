@@ -53,6 +53,7 @@ import javax.swing.SwingConstants;
 import javax.swing.border.BevelBorder;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.SimpleAttributeSet;
+import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
 
 import parser.EvaluationException;
@@ -872,6 +873,7 @@ public class ASM  {//implements Observer
 		if (sourceLineParts.isLineAllComment()) {
 			insertListing(sourceLineParts.getComment(), attrGreen);
 		} else {
+			insertListing(String.format("%4s",EMPTY_STRING),null);
 			insertListing(symbol, attributeSet1);
 			insertListing(cmd, attributeSet);
 			String argument = String.format("%-20s ", sourceLineParts.getArgumentField());
@@ -886,7 +888,7 @@ public class ASM  {//implements Observer
 	 * passOne sets up the symbol table with initial value for Labels & symbols
 	 */
 	private void passOne() {
-		clearDoc(docListing);
+//		clearDoc(docListing);
 
 		int lineNumber;
 		String sourceLine;
@@ -905,6 +907,7 @@ public class ASM  {//implements Observer
 			if (!sourceLineParts.isLineActive()) {
 				continue;
 			} // if skip textbox's empty lines
+			
 
 			lineNumber = sourceLineParts.getLineNumber();
 			allLineParts.add(sourceLineParts);
@@ -948,7 +951,7 @@ public class ASM  {//implements Observer
 			// ok let it go
 			break;
 		default:
-			System.out.printf("** Check line number %d directive is = %s%n", lineNumber, slp.getDirective());
+			 appLogger.addError(String.format("** Check line number %d directive is = %s%n", lineNumber, slp.getDirective()));
 			// look out for Include
 		}// switch
 
@@ -1320,15 +1323,15 @@ public class ASM  {//implements Observer
 	}// reportError
 
 	private void setAttributes() {
-//		StyleConstants.setForeground(attrNavy, new Color(0, 0, 128));
-//		StyleConstants.setForeground(attrBlack, new Color(0, 0, 0));
-//		StyleConstants.setForeground(attrBlue, new Color(0, 0, 255));
-//		StyleConstants.setForeground(attrGreen, new Color(0, 128, 0));
-//		StyleConstants.setForeground(attrTeal, new Color(0, 128, 128));
-//		StyleConstants.setForeground(attrGray, new Color(128, 128, 128));
-//		StyleConstants.setForeground(attrSilver, new Color(192, 192, 192));
-//		StyleConstants.setForeground(attrRed, new Color(255, 0, 0));
-//		StyleConstants.setForeground(attrMaroon, new Color(128, 0, 0));
+		StyleConstants.setForeground(attrNavy, new Color(0, 0, 128));
+		StyleConstants.setForeground(attrBlack, new Color(0, 0, 0));
+		StyleConstants.setForeground(attrBlue, new Color(0, 0, 255));
+		StyleConstants.setForeground(attrGreen, new Color(0, 128, 0));
+		StyleConstants.setForeground(attrTeal, new Color(0, 128, 128));
+		StyleConstants.setForeground(attrGray, new Color(128, 128, 128));
+		StyleConstants.setForeground(attrSilver, new Color(192, 192, 192));
+		StyleConstants.setForeground(attrRed, new Color(255, 0, 0));
+		StyleConstants.setForeground(attrMaroon, new Color(128, 0, 0));
 	}// setAttributes
 
 	private void appClose() {
@@ -1381,7 +1384,7 @@ public class ASM  {//implements Observer
 
 //		symbolTable.addObserver(this);
 		//
-//		setAttributes();
+		setAttributes();
 	}// appInit
 
 	public ASM() {

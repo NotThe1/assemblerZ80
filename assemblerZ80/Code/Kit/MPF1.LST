@@ -1,0 +1,3121 @@
+0001   0000             ; Monitor source code for Z80 Trainer Kit
+0002   0000             ; The original source code was for MPF-1
+0003   0000             ;
+0004   0000             
+0005   0000             ; 5 December 2014 add brightness adjustment for the display
+0006   0000             ; 6 December 2014 test serial TxD at 2400 bit/s
+0007   0000             ; 7 December 2014 test hex file download
+0008   0000             ; 12 December 2014 test upload and download hex file
+0009   0000             ;                  adjust monitor locations compatible with MPF-1
+0010   0000             ; 16 January 2015 change start text to CPU80
+0011   0000             ;                 remove display Accumulator in NMI
+0012   0000             ; 13 February 2015 fix serial port for 2400 bit/s
+0013   0000             ;                  now xtal frequency is 3.58MHz
+0014   0000             ;
+0015   0000             ;***********************************************************
+0016   0000             ;
+0017   0000             ;
+0018   0000             ;.FILL	0800H, 0FFH	;(Required to trick assembler into filling empty space with FFh bytes)
+0019   0000             
+0020   0000             ;
+0021   0000             P8255	.EQU	03H	;8255 I control port
+0022   0000             DIGIT	.EQU	01H	;8255 I port C
+0023   0000             SEG7	.EQU	02H	;8255 I port B
+0024   0000             KIN	.EQU	00H	;8255 I port A
+0025   0000             PWCODE	.EQU	0A5H	;Power-up code
+0026   0000             ZSUM	.EQU	71H	;This will make the sum of all
+0027   0000             			;monitor codes to be zero
+0028   0000             
+0029   0000             GPIO1   .EQU    40H     ; 8-bit LED display
+0030   0000             
+0031   0000             ; The following EQUATEs are used for timing.  Their values
+0032   0000             ; depend on the CPU clock frequency. (In this version, the
+0033   0000             ; crystal frequency is 1.79 MHz.)
+0034   0000             
+0035   0000             COLDEL	.EQU	201	;Column delay time for routine
+0036   0000             			:SCAN and SCAN1
+0037   0000             F1KHZ	.EQU	65	;Delay count for 1 kHz square wave,
+0038   0000             			;used by routine TONE1K.
+0039   0000             F2KHZ	.EQU	31	;Delay count for 2 kHz square wave,
+0040   0000             			;used by routine TONE2k.
+0041   0000             MPERIOD .EQU	42	;1 kHz and 2 kHz threshold, used by
+0042   0000             			;tape input routine PERIOD.
+0043   0000             
+0044   0000             ; The following EQUATEs are for tape modulation.
+0045   0000             ; If the quality of tape recorder is good, the user may
+0046   0000             ; change '4 4 2 8' to '2 2 1 4'. This will double
+0047   0000             ; the tape data rate.
+0048   0000             ; If the quality of tape recorder is poor, the user may
+0049   0000             ; change '4 4 2 8' to '6 6 3 12'. This will improve
+0050   0000             ; error performance but slow down the data rate.
+0051   0000             ; Although the data format is changed the tape is still
+0052   0000             ; compatible in each case, because only the ratio is
+0053   0000             ; detected in the Tape-read.
+0054   0000             
+0055   0000             ONE_1K	.EQU	4
+0056   0000             ONE_2K	.EQU	4
+0057   0000             ZERO_1K	.EQU	2
+0058   0000             ZERO_2K	.EQU	8
+0059   0000             
+0060   0000             ;***********************************************************
+0061   0000             ; I/O port assignment: (8255 I)
+0062   0000             
+0063   0000             ; port A (address 00H):
+0064   0000             ;	bit 7 -- tape input
+0065   0000             ;	bit 6 -- 'USER KEY' on keyboard, active low
+0066   0000             ;	bit 5-0 row of keyboard matrix input, active low
+0067   0000             ; port B (address 01H): 7 segments of LED, active high
+0068   0000             ;	bit 7 -- segment d
+0069   0000             ;	bit 6 -- decimal point
+0070   0000             ;	bit 5 -- segment c
+0071   0000             ;	bit 4 -- segment b
+0072   0000             ;	bit 3 -- segment a
+0073   0000             ;	bit 2 -- segment f
+0074   0000             ;	bit 1 -- segment g
+0075   0000             ;	bit 0 -- segment e
+0076   0000             ; port C (address 02H):
+0077   0000             ;	bit 7 -- tape & tone output
+0078   0000             ;	bit 6 -- BREAK enable. NMI (CPU pin 17) will go to
+0079   0000             ;		 low 5 M1's (machine cycle one) after this
+0080   0000             ;		 bit goes to low. (This bit is connected to
+0081   0000             ;		 the reset input of external counter.)
+0082   0000             ;	bit 5-0 -- colums of keyboard and the display matrix,
+0083   0000             ;		active high.  Bit 5 is the leftmost column.
+0084   0000             
+0085   0000             ;***********************************************************
+0086   0000             RST00	.ORG	00H		;Required to make sure assembler doesn't skip over address 0000H; original comment: -- reset --
+0087   0000             ; There are two cases that will generate a RESET signal:
+0088   0000             ;    (i) power-up
+0089   0000             ;   (ii) 'RS' key pressed
+0090   0000             ; In both cases, the following actions will be taken:
+0091   0000             ;   a) disable interrupt, set interrupt mode to 0
+0092   0000             ;      set I register to 00 and start execution
+0093   0000             ;      at address 0000 (by Z80 CPU itself).
+0094   0000             ;   b) initial user's PC to the lowest RAM address;
+0095   0000             ;   c) set user's SP to 1F9FH;
+0096   0000             ;   d) set user's I register to 00 and disable user's
+0097   0000             ;      interrupt flip-flop;
+0098   0000             ; In addition subroutine INI will be called on power-up
+0099   0000             ; reset, which has the following effects:
+0100   0000             ;   e) disable BREAK POINT;
+0101   0000             ;   f) set the contents of location 1FEEH and 1FEFH to 66
+0102   0000             ;      and 00 respectively. This will make instruction RST
+0103   0000             ;      38H (opcode FF) have the same effect as BREAK.
+0104   0000             ; Memory location POWERUP is used to distinguish power-up
+0105   0000             ; from RS-key.  (POWERUP) contains random data when
+0106   0000             ; power-up and contains PWCODE (0A5H) thereafter.
+0107   0000             
+0108   0000 06 00       	LD	B, 0
+0109   0002 10 FE       	DJNZ	$	;Power-up delay
+0110   0004             
+0111   0004             ; Initialize 8255 to mode 0 with port A input, port B and C
+0112   0004             ; output. The control word is 90H.
+0113   0004             
+0114   0004 3E C0       	LD	A, 0C0H
+0115   0006 D3 01       	OUT	(DIGIT), A
+0116   0008             
+0117   0008             ; When the control word is sent to 8255, all output
+0118   0008             ; ports are cleared to 0.  It is necessary to disable
+0119   0008             ; BREAK and deactivate all I/O by sending 0C0H to
+0120   0008             ; port C.
+0121   0008             
+0122   0008 AF          	XOR A
+0123   0009 D3 40       	OUT (GPIO1),A
+0124   000B             
+0125   000B 31 AF 1F    	LD	SP, SYSSTK	;initial system stack
+0126   000E             
+0127   000E             ; If the content of location POWERUP is not equal to
+0128   000E             ; PWCODE, call subroutine INI. Continue otherwise.
+0129   000E             
+0130   000E 3A E5 1F    	LD	A, (POWERUP)
+0131   0011 FE A5       	CP	PWCODE
+0132   0013 C4 B7 03    	CALL	NZ, INI
+0133   0016             
+0134   0016             ; Determine the lowest RAM address by checking whether
+0135   0016             ; address 1000H is RAM.  If yes, set user's PC to this
+0136   0016             ; value.  Otherwise, set it to 1800H.
+0137   0016             
+0138   0016 21 00 10    	LD	HL, 1000H
+0139   0019 CD F6 05    	CALL	RAMCHK
+0140   001C             	;JR	Z, PREPC
+0141   001C 26 18       	LD	H, 18H
+0142   001E 22 DC 1F    PREPC	LD	(USERPC), HL
+0143   0021 26 00       	LD	H, 0
+0144   0023             
+0145   0023             ; Address 28H and 30H are reserved for BREAK (RST 28H)
+0146   0023             ; and software BREAK (RST 30H).  Skip these area, monitor
+0147   0023             ; program resumes at RESET1.
+0148   0023             
+0149   0023 18 0D       	JR	RESET1
+0150   0025             ;
+0151   0025             ;***********************************************************
+0152   0028             RST28	.ORG	28H
+0153   0028             ; Address 28H is the entry point of BREAK trap.
+0154   0028             ; If a location is set as a BREAK point, the monitor
+0155   0028             ; will change the content of this location to C7 (RST 28H)
+0156   0028             ; before transfering control to user's program.
+0157   0028             ; In execution of user's program, a trap will occur if
+0158   0028             ; user's PC passes this location.  The monitor then takes
+0159   0028             ; over control and the content of BREAK address
+0160   0028             ; will be restored.  Monitor takes care of everything
+0161   0028             ; and makes the whole mechanism transparant to the user.
+0162   0028             ; The return address pushed onto stack is the PC after
+0163   0028             ; executing RST 28H.  The original break address should
+0164   0028             ; be one less than that.  The following 3 instructions
+0165   0028             ; decrease the content of (SP) by one without changing
+0166   0028             ; HL.
+0167   0028             
+0168   0028 E3          	EX	(SP), HL
+0169   0029 2B          	DEC	HL
+0170   002A E3          	EX	(SP), HL
+0171   002B 22 E8 1F    	LD	(HLTEMP), HL
+0172   002E 18 0E       	JR	CONT28
+0173   0030             ;
+0174   0030             ;***********************************************************
+0175   0030             RST30	.ORG	30H
+0176   0030             
+0177   0030             ; Instruction RST 30H (opcode F7) is usually used as:
+0178   0030             ;   i) Software break;
+0179   0030             ;  ii) Terminator of user's program.
+0180   0030             ; The effect of this instruction is to save all user's
+0181   0030             ; registers and return to monitor.
+0182   0030             
+0183   0030 18 34       	JR	NMI
+0184   0032             
+0185   0032             ;***********************************************************
+0186   0032             ; This is a part of reset routine.  Address 0028 and
+0187   0032             ; 0030 are reserved for break point.  Reset routine
+0188   0032             ; skips this area and resumes here.
+0189   0032             ;
+0190   0032 22 D2 1F    RESET1	LD	(USERIF), HL	;set user's I register and
+0191   0035             				;interrupt flip flop to 0
+0192   0035 18 1D       	JR	RESET2		;monitor resumes at RESET2
+0193   0037             
+0194   0037             ;***********************************************************
+0195   0037             
+0196   0037             ; The following byte makes the sum of the monitor
+0197   0037             ; code in ROM zero. ROMTEST is a self-checking routine.
+0198   0037             ; This routine requires the sum of ROM to be zero.
+0199   0037             
+0200   0037 71          	.BYTE	ZSUM
+0201   0038             ;
+0202   0038             ;***********************************************************
+0203   0038             RST38	.ORG	38H
+0204   0038             
+0205   0038             ; Entry point of RST 38H (opcode FF) or mode 1 interrupt.
+0206   0038             ; Fetch the address stored in location 1FEE and 1FEF,
+0207   0038             ; then jump to this address.  Initially, 1FEE and 1FEF
+0208   0038             ; are set to 0066.  So RST 38 will have the same effect
+0209   0038             ; as software break.  By changing the content of 1FEE
+0210   0038             ; and 1FEF, the user can define his or her own service
+0211   0038             ; routine.
+0212   0038             ; The next three instructions push the contents of 1FEE
+0213   0038             ; and 1FEF to stack without changing any registers.
+0214   0038             
+0215   0038 E5          	PUSH	HL
+0216   0039 2A EE 1F    	LD	HL, (IM1AD)
+0217   003C E3          	EX	(SP), HL
+0218   003D             
+0219   003D             ; The top of the stack is now the address of user
+0220   003D             ; defined service routine.  Pop out this address then
+0221   003D             ; branch to it.
+0222   003D             
+0223   003D C9          	RET
+0224   003E             ;
+0225   003E             ;***********************************************************
+0226   003E             CONT28:
+0227   003E             ; This is a part of break service routine.  It continues
+0228   003E             ; the program at RST28.
+0229   003E             
+0230   003E 32 E7 1F    	LD	(ATEMP), A
+0231   0041             
+0232   0041             ; The monitor has changed the content of user's
+0233   0041             ; program at break address.  The next 3 instructions
+0234   0041             ; restore the destroyed content.  BRAD contains the
+0235   0041             ; break address, BRDA contains the original data at
+0236   0041             ; break address.
+0237   0041             
+0238   0041 2A E0 1F    	LD	HL, (BRAD)
+0239   0044 3A E2 1F    	LD	A, (BRDA)
+0240   0047 77          	LD	(HL), A
+0241   0048             
+0242   0048             ; Send break enable signal to hardware counter.
+0243   0048             ; A nonmaskable interrupt will be issued at the 5th M1's
+0244   0048             
+0245   0048 3E 80       	LD	A, 10000000B
+0246   004A D3 01       	OUT	(DIGIT), A
+0247   004C 3A E7 1F    	LD	A, (ATEMP)	; 1st M1
+0248   004F 2A E8 1F    	LD	HL, (HLTEMP)	; 2nd M1
+0249   0052 00          	NOP			; 3rd M1
+0250   0053 C9          	RET			; 4th M1
+0251   0054             
+0252   0054             ; Return to user's program.  Execute the instruction
+0253   0054             ; at break address.  After finishing one instruction,
+0254   0054             ; a nonmaskable interrupt happens and control is
+0255   0054             ; transferred to the monitor again.
+0256   0054             ;
+0257   0054             RESET2:
+0258   0054 21 9F 1F    	LD	HL, USERSTK
+0259   0057 22 D0 1F    	LD	(USERSP), HL	;set user's SP
+0260   005A AF          	XOR	A
+0261   005B 32 E6 1F    	LD	(TEST), A
+0262   005E             
+0263   005E             ; TEST is a flag for monitor's own use.  Illegal key-in
+0264   005E             ; blanking (bit 7 of TEST) and automatic leading zero
+0265   005E             ; (bit 0) use this flag.  Clear it here.
+0266   005E             
+0267   005E DD 21 9F 07 	LD	IX, MPF_I
+0268   0062             
+0269   0062             ; Address 0066 is the address for nonmaskable interrupt
+0270   0062             ; Skip this area, monitor resumes at SETST0
+0271   0062             
+0272   0062 C3 D2 00    	JP	SETST0
+0273   0065             
+0274   0065             ;***********************************************************
+0275   0066             NMI	.ORG	66H
+0276   0066             
+0277   0066             ; Entry point of nonmaskable interrupt.  NMI will occur
+0278   0066             ; when MONI key is pressed or when user's program is
+0279   0066             ; breaked.  The service routine which starts here saves all
+0280   0066             ; user's registers and status.  It also checks the validity
+0281   0066             ; of user's SP.
+0282   0066             
+0283   0066 32 E7 1F    	LD	(ATEMP), A	;save A register
+0284   0069             	;OUT     (GPIO1),A       ; display ACC at GPIO1
+0285   0069 00          	nop
+0286   006A 00          	nop
+0287   006B 3E 90       	LD	A, 10010000B
+0288   006D D3 03       	OUT	(P8255), A	;set 8255 to mode 0.
+0289   006F             	
+0290   006F             				;Port A input; B,C output.
+0291   006F 3E C0       	LD	A, 0C0H
+0292   0071 D3 01       	OUT	(DIGIT), A	;disable break and LED's
+0293   0073 3A E7 1F    	LD	A, (ATEMP)	;restore A register
+0294   0076 22 E8 1F    RGSAVE	LD	(HLTEMP), HL	;save register HL
+0295   0079 E1          	POP	HL		;get return address from stack
+0296   007A 22 DE 1F    	LD	(ADSAVE), HL	;Save return address into
+0297   007D             				;ADSAVE.
+0298   007D 22 DC 1F    	LD	(USERPC), HL	;Set user's PC to return
+0299   0080             				;address.
+0300   0080 2A E8 1F    	LD	HL, (HLTEMP)	;restore HL register
+0301   0083 ED 73 D0 1F 	LD	(USERSP), SP	;set user's SP to current SP
+0302   0087 31 D0 1F    	LD	SP, USERIY+2	;save other registers by
+0303   008A FD E5       	PUSH	IY		;continously pushing them
+0304   008C DD E5       	PUSH	IX		;onto stack
+0305   008E D9          	EXX
+0306   008F E5          	PUSH	HL
+0307   0090 D5          	PUSH	DE
+0308   0091 C5          	PUSH	BC
+0309   0092 D9          	EXX
+0310   0093 08          	EX	AF,AF'
+0311   0094 F5          	PUSH	AF
+0312   0095 08          	EX	AF,AF'
+0313   0096 E5          	PUSH	HL
+0314   0097 D5          	PUSH	DE
+0315   0098 C5          	PUSH	BC
+0316   0099 F5          	PUSH	AF
+0317   009A             
+0318   009A             ; The next two instructions save I register.
+0319   009A             ; The interrupt flip-flop (IFF2) is copied into
+0320   009A             ; parity flag (P/V) by instruction LD  A, I.
+0321   009A             ; The interrupt status (enabled or disabled)
+0322   009A             ; can be determined by testing parity flag.
+0323   009A             
+0324   009A ED 57       	LD	A, I
+0325   009C 32 D3 1F    	LD	(USERIF+1), A
+0326   009F             
+0327   009F             ; The next four instructions save IFF2 into
+0328   009F             ; user's IFF.
+0329   009F             
+0330   009F 3E 00       	LD	A, 0
+0331   00A1 E2 A6 00    	JP	PO, SETIF	;PO -- P/V = 0
+0332   00A4 3E 01       	LD	A, 1
+0333   00A6 32 D2 1F    SETIF	LD	(USERIF), A
+0334   00A9             ;
+0335   00A9 31 AF 1F    	LD	SP, SYSSTK	;set SP to system stack
+0336   00AC             
+0337   00AC             ;The next 8 instructions check user's SP.
+0338   00AC             ; If the user's SP points to a location not
+0339   00AC             ; in RAM, display ERR-SP.
+0340   00AC             
+0341   00AC 2A D0 1F    	LD	HL, (USERSP)
+0342   00AF DD 21 B5 07 	LD	IX, ERR_SP
+0343   00B3 2B          	DEC	HL
+0344   00B4 CD F6 05    	CALL	RAMCHK
+0345   00B7 20 19       	JR	NZ, SETST0
+0346   00B9 2B          	DEC	HL
+0347   00BA CD F6 05    	CALL	RAMCHK
+0348   00BD 20 13       	JR	NZ, SETST0
+0349   00BF             
+0350   00BF             ; If the user's stack and system stack are
+0351   00BF             ; overlayed, display SYS-SP.  This checking
+0352   00BF             ; is done by the following instructions.
+0353   00BF             
+0354   00BF DD 21 AF 07 	LD	IX, SYS_SP
+0355   00C3 00          	NOP
+0356   00C4 00          	NOP
+0357   00C5             
+0358   00C5 11 62 E0    	LD	DE, -USERSTK+1
+0359   00C8 19          	ADD	HL, DE
+0360   00C9 38 07       	JR	C, SETST0
+0361   00CB DD 21 B6 1F 	LD	IX, DISPBF
+0362   00CF 37          	SCF			;set carryflag to indicate
+0363   00D0             				;the user's SP is legal.
+0364   00D0 18 04       	JR	BRRST0
+0365   00D2             ;
+0366   00D2             SETST0:
+0367   00D2             ; STATE is a memory location containing the monitor status.
+0368   00D2             ; It will be described in detail later.  STATE 0 stands
+0369   00D2             ; for fixed display pattern.  The initial pattern 'uPF--1'
+0370   00D2             ; or message 'SYS-SP'... belong to this category.  The next
+0371   00D2             ; two instructions set STATE to zero.
+0372   00D2             
+0373   00D2 AF          	XOR	A		;set A to 0, also clear Carry flag
+0374   00D3 32 E4 1F    	LD	(STATE), A
+0375   00D6 3A E2 1F    BRRST0	LD	A, (BRDA)	;restore the data at
+0376   00D9             				;break address
+0377   00D9 2A E0 1F    	LD	HL, (BRAD)
+0378   00DC 77          	LD	(HL), A
+0379   00DD             
+0380   00DD             ; If the user's SP is legal SP is legal (carry set),
+0381   00DD             ; display user's PC and the content at PC.
+0382   00DD             ; Otherwise, display fixed message (ERR-SP
+0383   00DD             ; or SYS-SP or uPF--1)
+0384   00DD DC 01 04    	CALL	C, MEMDP2
+0385   00E0             ;
+0386   00E0             ;
+0387   00E0             ;***********************************************************
+0388   00E0             ; Scan the display and keyboard. When a key is
+0389   00E0             ; detected, take proper action  according to the
+0390   00E0             ; key pressed.
+0391   00E0             
+0392   00E0             MAIN:
+0393   00E0 31 AF 1F    	LD	SP, SYSSTK	;Initialize system stack
+0394   00E3 CD FE 05    	CALL	SCAN		;Scan display and input keys.
+0395   00E6             				:Routine SCAN will not return until
+0396   00E6             				;any key is pressed.
+0397   00E6 CD CB 06    	CALL	BEEP		;After a key is detected, there
+0398   00E9             				;will be accompanied with a beep
+0399   00E9             				;sound.
+0400   00E9 18 F5       	JR	MAIN		;Back to MAIN, get more keys and
+0401   00EB             				;execute them.
+0402   00EB             ;
+0403   00EB             ;
+0404   00EB             ;***********************************************************
+0405   00EB             KEYEXEC:
+0406   00EB             
+0407   00EB             ; Input key dispatch routine.
+0408   00EB             ; This routine uses the key code returned by subroutine
+0409   00EB             ; SCAN, which is one byte stored in A register.  The
+0410   00EB             ; range of key codes is from 00 to 1FH.
+0411   00EB             
+0412   00EB             ;  (i) key code = 00 - 0FH :
+0413   00EB             ;      These are hexadecimal keys.  Branch to routine KHEX.
+0414   00EB             
+0415   00EB FE 10       	CP	10H
+0416   00ED 38 24       	JR	C, KHEX
+0417   00EF             
+0418   00EF             ; If the key entered is not hexadecimal, it must be a
+0419   00EF             ; function or subfunction key.  This means the previous
+0420   00EF             ; numeric entry has terminated.  Bit 0 of TEST flag
+0421   00EF             ; must be set at the beginning of a new numeric entry.
+0422   00EF             ; This is done by the next two instructions.  (If bit 0
+0423   00EF             ; of TEST is set, the data buffer will be automatically
+0424   00EF             ; cleared when a hexadecimal key is entered.)
+0425   00EF             
+0426   00EF 21 E6 1F    	LD	HL, TEST
+0427   00F2 CB C6       	SET	0, (HL)
+0428   00F4             
+0429   00F4             ; (ii) key code = 10H - 17H :
+0430   00F4             ;      (+, -, GO, STEP, DATA, SBR, INS, DEL)
+0431   00F4             ;      There is no state corresponding to these keys.
+0432   00F4             ;      The response of them depends on the current
+0433   00F4             ;      state and minor-state. (E.g., the response of '+'
+0434   00F4             ;      key depends on the current function.  It is illegal
+0435   00F4             ;      when the display is 'uPF--1', but is legal when the
+0436   00F4             ;      display is of 'address-data' form.)  In this
+0437   00F4             ;      documentation, they are named 'sub-function key'.
+0438   00F4             ;      They are all branched by table KSUBFUN and routine
+0439   00F4             ;      BRANCH.
+0440   00F4             
+0441   00F4 D6 10       	SUB	10H
+0442   00F6 FE 08       	CP	8
+0443   00F8 21 37 07    	LD	HL, KSUBFUN
+0444   00FB DA A6 03    	JP	C, BRANCH
+0445   00FE             
+0446   00FE             ;(iii) key code = 18H - 1FH
+0447   00FE             ;      (PC, Addr, CBr, Reg, Move, Rela, WRtape, RDtape)
+0448   00FE             ;      These keys are named 'function key'. They are
+0449   00FE             ;      acceptable at any time.  When they are hit, the
+0450   00FE             ;      monitor will unconditionally enter a new state.
+0451   00FE             ;      STMINOR contains the minor-state, which is required
+0452   00FE             ;      to dispatch some sub-function keys (e.g. +, -).
+0453   00FE             
+0454   00FE DD 21 B6 1F 	LD	IX, DISPBF
+0455   0102 D6 08       	SUB	8
+0456   0104 21 E4 1F    	LD	HL, STATE
+0457   0107 77          	LD	(HL), A		;set STATE to key-code minus 18H
+0458   0108             				;The STATE is updated here.  It will
+0459   0108             				;be modified later by local service
+0460   0108             				;routines if the function-key is PC,
+0461   0108             				;Addr or CBr.  For other function-
+0462   0108             				;keys, STATE will not be modified
+0463   0108             				;later.
+0464   0108 21 E3 1F    	LD	HL, STMINOR
+0465   010B 36 00       	LD	(HL), 0		;set STMINOR to 0
+0466   010D 21 41 07    	LD	HL, KFUN	;KFUN is the base of the branch table
+0467   0110             				;the offset is stored in A
+0468   0110 C3 A6 03    	JP	BRANCH
+0469   0113             
+0470   0113             ;
+0471   0113             ;***********************************************************
+0472   0113             ;STATE:
+0473   0113             ;   0=FIX	;Display fixed pattern, e.g. 'uPF--1'.
+0474   0113             ;   1=AD	;The hex key entered is interpreted as
+0475   0113             		;memory addres.
+0476   0113             ;   2=DA	;The hex key entered is interpreted as
+0477   0113             		;memory data.
+0478   0113             ;   3=RGFIX	;Display fixed pattern: 'Reg-  ' and
+0479   0113             		;expect register name to be entered.
+0480   0113             ;   4=MV	;Expect parameters for 'Move' function.
+0481   0113             ;   5=RL	;Expect parameters for 'Rela' function.
+0482   0113             ;   6=WT	;Expect parameters for 'WRtape' func.
+0483   0113             ;   7=RT	;Expect parameters for 'RDtape' func.
+0484   0113             ;   8=RGAD	;Hex-key entered will be interpreted as
+0485   0113             		;address name for registers.
+0486   0113             ;   9=RGDA	;Hex-key entered will be interpreted as
+0487   0113             		; data for registers.
+0488   0113             ;
+0489   0113             ; Subroutine naming conventions:
+0490   0113             ;    (i) K???? -- K stands for key, ???? is the key name,
+0491   0113             ;                 e.g. KINS corresponds to key 'INS'.  Each
+0492   0113             ;                 time a key ???? is entered, the routine
+0493   0113             ;                 with name K???? will be executed.  All of
+0494   0113             ;                 them are branched by table KFUN or KSUBFUN.
+0495   0113             ;   (ii) H???? -- H stands for hexadecimal, ???? is the
+0496   0113             ;                 current STATE.  For example, routine
+0497   0113             ;                 HDA will be executed if the entered
+0498   0113             ;                 key is hexadecimal and STATE is DA now.
+0499   0113             ;                 These routines are branched by table
+0500   0113             ;                 HTAB.
+0501   0113             ;  (iii) I???? -- I stands for increment (+ key), ???? is
+0502   0113             ;                 the current STATE.  E.g. IMV will be
+0503   0113             ;                 executed when STATE is MV and '+' key
+0504   0113             ;                 is entered.  These routines are branched
+0505   0113             ;                 by table ITAB
+0506   0113             ;   (iv) D???? -- D stands for decrement (- key), ???? is
+0507   0113             ;                 the current STATE.  These routines are
+0508   0113             ;                 branched using table DTAB.
+0509   0113             ;    (v) G???? -- G stands for 'GO' key, ???? is the current
+0510   0113             ;                 STATE.  These routines are branched using
+0511   0113             ;                 table GTAB.
+0512   0113             
+0513   0113             ;***********************************************************
+0514   0113             
+0515   0113             ; Hexadecimal, '+', '-' and 'GO' keys may be entered after
+0516   0113             ; different function keys.  The monitor uses branch tables
+0517   0113             ; and STATE to determine the current function and branch
+0518   0113             ; to the proper entry point.
+0519   0113             ;
+0520   0113             KHEX:
+0521   0113             ;Executed when hexadecimal keys are pressed.
+0522   0113             ;Use HTAB and STATE for further branch.
+0523   0113             
+0524   0113 4F          	LD	C, A		;save A register in C
+0525   0114             				;which is the hex key-code.
+0526   0114 21 4B 07    	LD	HL, HTAB
+0527   0117 3A E4 1F    BR1	LD	A, (STATE)
+0528   011A C3 A6 03    	JP	BRANCH
+0529   011D             ;
+0530   011D             
+0531   011D             KINC:
+0532   011D             ;Branched by KSUBFUN table.
+0533   011D             ;Executed when '+' key is pressed.
+0534   011D             ;Use ITAB and STATE for further branch.
+0535   011D             ;STATE will be stored in A register at BR1.
+0536   011D             
+0537   011D 21 57 07    	LD	HL, ITAB
+0538   0120 18 F5       	JR	BR1
+0539   0122             
+0540   0122             ;
+0541   0122             KDEC:
+0542   0122             ;Branched by KSUBFUN table.
+0543   0122             ;Executed when '-' key is pressed.
+0544   0122             ;Use DTAB and STATE for further branch.
+0545   0122             ;STATE will be stored in A register at BR1.
+0546   0122             
+0547   0122 21 63 07    	LD	HL, DTAB
+0548   0125 18 F0       	JR	BR1
+0549   0127             
+0550   0127             ;
+0551   0127             KGO:
+0552   0127             ;Branched by KSUBFUN table.
+0553   0127             ;Executed when 'GO' key is pressed.
+0554   0127             ;Use DTAB and STATE for further branch.
+0555   0127             ;STATE will be stored in A register at BR1.
+0556   0127             
+0557   0127 21 6F 07    	LD	HL, GTAB
+0558   012A 18 EB       	JR	BR1
+0559   012C             
+0560   012C             ;
+0561   012C             KSTEP:
+0562   012C             ;Branched by table KSUBFUN.
+0563   012C             ;Executed when 'STEP' key is pressed.
+0564   012C             
+0565   012C CD DB 03    	CALL	TESTM		;Check if the left 4 digits
+0566   012F             				;of the display are a memory address.
+0567   012F C2 B1 03    	JP	NZ, IGNORE	;If not, disable all LED's as
+0568   0132             				;a warning to the user.  This
+0569   0132             				;is done by routine IGNORE.
+0570   0132             
+0571   0132 3E 80       	LD	A, 10000000B	;This data will be output
+0572   0134             				;to port B to enable
+0573   0134             				;BREAK.  It is done by
+0574   0134             				;routine PREOUT.
+0575   0134 C3 A5 02    	JP	PREOUT
+0576   0137             
+0577   0137             ;
+0578   0137             KDATA:
+0579   0137             ;Branched by table KSUBFUN.
+0580   0137             ;Executed when 'DATA' key is pressed.
+0581   0137             
+0582   0137 CD DB 03    	CALL	TESTM		;Check if the left 4 digits
+0583   013A             				;of the display are a memory address.
+0584   013A 20 04       	JR	NZ, TESTRG	;If not, branch to TESTRG
+0585   013C             				;to check whether the display
+0586   013C             				;is register or not.
+0587   013C CD 01 04    	CALL	MEMDP2		;If yes, display the data of
+0588   013F             				;that address and set STATE
+0589   013F             				;to 2.
+0590   013F C9          	RET
+0591   0140 FE 08       TESTRG	CP	8		;check if the status is 8 or 9
+0592   0142             				;(RGAD or RGDA).
+0593   0142 DA B1 03    	JP	C, IGNORE	;If not, ignore this key and
+0594   0145             				;send out a warning message.
+0595   0145 CD 6D 04    	CALL	REGDP9		;If yes, display register and
+0596   0148             				;set status to 9 (RGDA).
+0597   0148 C9          	RET
+0598   0149             
+0599   0149             ;
+0600   0149             KSBR:
+0601   0149             ;Branched by table KSUBFUN.
+0602   0149             ;Executed when 'SBr' key (set break point)
+0603   0149             ; is pressed.
+0604   0149             
+0605   0149 CD DB 03    	CALL	TESTM		;Check if the display is of
+0606   014C             				;'address-data' form.
+0607   014C C2 B1 03    	JP	NZ, IGNORE	;If not, ignore this key and
+0608   014F             				;send out a warning message.
+0609   014F 2A DE 1F    	LD	HL, (ADSAVE)	;If yes, get the address
+0610   0152             				;being displayed now.
+0611   0152 CD F6 05    	CALL	RAMCHK		;Check if this address is
+0612   0155             				;in RAM.
+0613   0155 C2 B1 03    	JP	NZ, IGNORE	;If not, ignore the 'SBR' key
+0614   0158             				;and send out a warning message.
+0615   0158 22 E0 1F    	LD	(BRAD), HL	;If yes, set this address as
+0616   015B             				;a break point.
+0617   015B CD 01 04    	CALL	MEMDP2		;Display the data of break
+0618   015E             				;address and set STATE to
+0619   015E             				;2 (DA).
+0620   015E C9          	RET
+0621   015F             
+0622   015F             ;
+0623   015F             KINS:
+0624   015F             ;Branched by table KSUBFUN.
+0625   015F             ;Executed when 'Ins' key (insert) is pressed.
+0626   015F             
+0627   015F CD DB 03    	CALL	TESTM		;Check if the display is of
+0628   0162             				;'addres-data' form.
+0629   0162 C2 B1 03    	JP	NZ, IGNORE	;If not, ignore the 'INS' key
+0630   0165             				;and send out a warning message.
+0631   0165 2A DE 1F    	LD	HL, (ADSAVE)	;If yes, get the address being
+0632   0168             				;displayed now.
+0633   0168             
+0634   0168 00          	NOP
+0635   0169             
+0636   0169 22 AF 1F    	LD	(STEPBF), HL	;Store this address in
+0637   016C             				;STEPBF and the next address
+0638   016C             				;in STEPBF+4 for later use.
+0639   016C 23          	INC	HL
+0640   016D 22 B3 1F    	LD	(STEPBF+4), HL
+0641   0170 CD F6 05    	CALL	RAMCHK		;Check if the address to be
+0642   0173             				;inserted is in RAM.
+0643   0173 C2 B1 03    	JP	NZ, IGNORE	;If not, ignore the 'INS' key
+0644   0176             				;and send out a warning message.
+0645   0176             				;If the address to be inserted
+0646   0176             				;is in 1800-1DFF, store 1DFE into
+0647   0176             				;STEPBF+2
+0648   0176             				;Otherwise, ignore the 'INS' key.
+0649   0176             				;This is done by the following
+0650   0176             				;instructions.
+0651   0176 11 FE 1D    	LD	DE, 1DFEH
+0652   0179 7C          	LD	A, H
+0653   017A FE 1E       	CP	1EH
+0654   017C 38 07       	JR	C, SKIPH1
+0655   017E FE 20       	CP	20H
+0656   0180 DA B1 03    	JP	C, IGNORE
+0657   0183 16 27       	LD	D, 27H
+0658   0185 ED 53 B1 1F SKIPH1	LD	(STEPBF+2), DE
+0659   0189             
+0660   0189             ;When one byte is inserted at some
+0661   0189             ;address, all data below this address
+0662   0189             ;will be shifted down one position.
+0663   0189             ;The last location will be shifted out
+0664   0189             ;and therefore lost.
+0665   0189             ;The RAM is divided into 3 blocks as
+0666   0189             ;insert is concerned.  They are:
+0667   0189             ;1800-1DFF, 1E00-1FFF and 2000-27FF
+0668   0189             ;The 2nd block cannot be inserted and
+0669   0189             ;is usually used as data bank.  System
+0670   0189             ;data that of course cannot be shifted
+0671   0189             ;is also stored in this bank.  Each
+0672   0189             ;block is independent of the other when
+0673   0189             ;shift is performed, i.e. the data
+0674   0189             ;shifted out of the first block will not
+0675   0189             ;be propagated to next block.
+0676   0189             ;The shift is accomplished by block
+0677   0189             ;transfer, i.e. MOVE.  This is the
+0678   0189             ;job of subroutine GMV.
+0679   0189             ;Routine GMV needs 3 parameters which
+0680   0189             ;are stored in step-buffer (STEPBF):
+0681   0189             ;STEPBF: starting address (2 bytes);
+0682   0189             ;STEPBF+2: ending address (2 bytes);
+0683   0189             ;STEPBF+4: destination address (2 bytes).
+0684   0189             
+0685   0189 CD E6 02    DOMV	CALL	GMV
+0686   018C AF          	XOR	A		;After the RAM has been shifted down,
+0687   018D 12          	LD	(DE), A		;the data of the address to be inserted
+0688   018E             				;is cleared to zero.  This is done by
+0689   018E             				;these two instructions.  Register
+0690   018E             				;DE contains inserted address after GMV
+0691   018E             				;is performed.
+0692   018E             
+0693   018E 2A B3 1F    	LD	HL, (STEPBF+4)	;Store the data in (STEPBF+4)
+0694   0191 22 DE 1F    	LD	(ADSAVE), HL	;into (ADSAVE).
+0695   0194 CD 01 04    	CALL	MEMDP2		;Display the address and data also
+0696   0197             				;set STATE to 2.
+0697   0197 C9          	RET
+0698   0198             ;
+0699   0198             KDEL:
+0700   0198             ;Branched by table KSUBFUN.
+0701   0198             ;Executed when 'Del' (delete) key is pressed.
+0702   0198             
+0703   0198 CD DB 03    	CALL	TESTM		;Check if the display is of
+0704   019B             				;'address-data' form.
+0705   019B C2 B1 03    	JP	NZ, IGNORE	;If not, ignore the 'Del' key and
+0706   019E             				;send out a warning message.
+0707   019E             				;'Delete' is quite similar to
+0708   019E             				;'Insert',except that the memory
+0709   019E             				;is shifted up up instead of shifted
+0710   019E             				;down.  See the comments on
+0711   019E             				;routine KINS for details.
+0712   019E 2A DE 1F    	LD	HL, (ADSAVE)	;Get the address being displayed
+0713   01A1             				;now.  This is the address to
+0714   01A1             				;be deleted.
+0715   01A1             
+0716   01A1             
+0717   01A1 00          	NOP
+0718   01A2             
+0719   01A2 22 B3 1F    	LD	(STEPBF+4), HL
+0720   01A5 CD F6 05    	CALL	RAMCHK		;Check if the address is in RAM.
+0721   01A8 C2 B1 03    	JP	NZ, IGNORE	;If not, ignore this key and
+0722   01AB             				;send out a warning message.
+0723   01AB             				;Following instructions prepare the
+0724   01AB             				;parameters for routine GMV in step-
+0725   01AB             				;buffer.  Refer to routine KINS for
+0726   01AB             				;detail.
+0727   01AB 11 00 1E    	LD	DE, 1E00H
+0728   01AE 7C          	LD	A, H
+0729   01AF FE 1E       	CP	1EH
+0730   01B1 38 07       	JR	C, SKIPH2
+0731   01B3 FE 20       	CP	20H
+0732   01B5 DA B1 03    	JP	C, IGNORE
+0733   01B8 16 28       	LD	D, 28H
+0734   01BA ED 53 B1 1F SKIPH2	LD	(STEPBF+2), DE
+0735   01BE 23          	INC	HL
+0736   01BF 22 AF 1F    	LD	(STEPBF), HL
+0737   01C2 18 C5       	JR	DOMV
+0738   01C4             ;
+0739   01C4             ;***********************************************************
+0740   01C4             KPC:
+0741   01C4             ;Branched by table KFUN.
+0742   01C4             ;Executed when 'PC' key is pressed.
+0743   01C4             
+0744   01C4 2A DC 1F    	LD	HL, (USERPC)	;Store the user's program
+0745   01C7 22 DE 1F    	LD	(ADSAVE), HL	;counter into (ADSAVE)
+0746   01CA CD 01 04    	CALL	MEMDP2		;Routine MEMDP2 displays the address
+0747   01CD             				;in (ADSAVE) and its data.  It also
+0748   01CD             				;sets the STATE to 2.
+0749   01CD C9          	RET
+0750   01CE             ;
+0751   01CE             KCBR:
+0752   01CE             ;Branched by table KFUN.
+0753   01CE             ;Executed when 'CBr' (clear break point) key is pressed.
+0754   01CE             
+0755   01CE CD D4 03    	CALL	CLRBR		;Call subroutine CLRBR to clear
+0756   01D1             				;break point.  When returned, the HL
+0757   01D1             				;register will contain FFFF.
+0758   01D1 22 DE 1F    	LD	(ADSAVE), HL	;Store FFFF into (ADSAVE)
+0759   01D4 CD 01 04    	CALL	MEMDP2		;Display address and its data.  Also
+0760   01D7             				;set STATE to 2.
+0761   01D7 C9          	RET
+0762   01D8             ;
+0763   01D8             KREG:
+0764   01D8             ;Branched by table KFUN.
+0765   01D8             ;Executed when 'Reg' key is pressed.
+0766   01D8 DD 21 CA 07 	LD	IX, REG_	;Routine SCAN uses IX as a pointer
+0767   01DC             				;for display buffer.  Setting IX to REG
+0768   01DC             				;will cause SCAN to display 'Reg-  '
+0769   01DC CD BA 04    	CALL	FCONV		;Decode user's flag F and F' to
+0770   01DF             				;binary display format.  This
+0771   01DF             				;format will be used later, when
+0772   01DF             				;user requires the monitor to
+0773   01DF             				;display decoded flag by pressing
+0774   01DF             				;keys 'SZXH', 'XPNC',...
+0775   01DF C9          	RET
+0776   01E0             ;
+0777   01E0             KADDR:
+0778   01E0             ;Branched by table KFUN.
+0779   01E0             ; Executed when 'Addr' key is pressed.
+0780   01E0             
+0781   01E0 CD F8 03    	CALL	MEMDP1		;Display the address stored in
+0782   01E3             				;(ADSAVE) and its data.  Set STATE
+0783   01E3             				;to 1 (AD)
+0784   01E3 C9          	RET
+0785   01E4             ;
+0786   01E4             ; Function Move, Relative, Read-tape and
+0787   01E4             ; Write-tape require from one to three
+0788   01E4             ; parameters.  They are stored in STEPBF
+0789   01E4             ; (step buffer).  STMINOR (minor status)
+0790   01E4             ; contains the number of parameters that has
+0791   01E4             ; been entered.  For Move and Relative, the
+0792   01E4             ; default value of the first parameter is
+0793   01E4             ; the address stored in (ADSAVE).  There
+0794   01E4             ; is no default value for the first parameter
+0795   01E4             ; (filename) of Read- and Write-tape.  When the
+0796   01E4             ; function keys are pressed, STMINOR is automatically
+0797   01E4             ; reset to 0.
+0798   01E4             ;
+0799   01E4             
+0800   01E4             KMV:
+0801   01E4             ;Branched by table KFUN.
+0802   01E4             ;Executed when 'Move' key is pressed.
+0803   01E4             KRL:
+0804   01E4             ;Branched by table KFUN.
+0805   01E4             ;Executed when 'Rela' (relative) key is pressed.
+0806   01E4 2A DE 1F    	LD	HL, (ADSAVE)	;Store the contents of ADSAVE
+0807   01E7 22 AF 1F    	LD	(STEPBF), HL	;into STEPBF as default value
+0808   01EA             				;of first parameter.
+0809   01EA             
+0810   01EA             KWT:
+0811   01EA             ;Branched by table KFUN.
+0812   01EA             ;Executed when 'WRtape' key is pressed.
+0813   01EA             
+0814   01EA             KRT:
+0815   01EA             ;Branched by table KFUN.
+0816   01EA             ;Executed when 'RDtape' key is pressed.
+0817   01EA             
+0818   01EA CD 30 04    	CALL	STEPDP		;Display the parameter that
+0819   01ED             				;is being entered now by calling
+0820   01ED             				;subroutine STEPDP.
+0821   01ED C9          	RET
+0822   01EE             ;
+0823   01EE             ;***********************************************************
+0824   01EE             ; The following subroutines with name H???
+0825   01EE             ; are the service routines for hexadecimal
+0826   01EE             ; keys corresponding to each STATE.  They
+0827   01EE             ; are all branched by table HTAB and STATE.
+0828   01EE             
+0829   01EE C3 B1 03    HFIX	JP	IGNORE		;When the display is fixed pattern
+0830   01F1             				;hexadecimal keys are illegal.
+0831   01F1             				;Disable all LED's as a warning
+0832   01F1             				;message to the user.  This is what
+0833   01F1             				;routine IGNORE does.
+0834   01F1             ;
+0835   01F1 2A DE 1F    HDA	LD	HL, (ADSAVE)	;Get the address being displayed
+0836   01F4             				;now from (ADSAVE)
+0837   01F4 CD F6 05    	CALL	RAMCHK		;Check if it is in RAM.
+0838   01F7 C2 B1 03    	JP	NZ, IGNORE	;If not, ignore this key and
+0839   01FA             				;send out a warning message.
+0840   01FA CD E4 03    	CALL	PRECL1		;If this is the first hexadecimal
+0841   01FD             				;key entered after function or sub-
+0842   01FD             				;function key, reset the data of that
+0843   01FD             				;address to 0. (by routine PERCL1)
+0844   01FD 79          	LD	A, C		;The key-code is saved in C by
+0845   01FE             				;routine KHEX.  Restore it to A.
+0846   01FE ED 6F       	RLD			;Rotate the key-code (4 bits) into
+0847   0200             				;the address obtained above. (in HL)
+0848   0200 CD 01 04    	CALL	MEMDP2		;Display the address and data,
+0849   0203             				;then set STATE to 2 (DA).
+0850   0203 C9          	RET
+0851   0204             ;
+0852   0204 21 DE 1F    HAD:	LD	HL, ADSAVE
+0853   0207 CD F0 03    	CALL	PRECL2		;If this is the first hexadecimal
+0854   020A             				;key after function key is entered,
+0855   020A             				;set the contents of ADSAVE to 0.
+0856   020A 79          	LD	A, C		;The key-code is saved in C
+0857   020B             				;by routine KHEX.
+0858   020B             				;The next three instructions shift
+0859   020B             				;the addres being displayed by
+0860   020B             				;one digit.
+0861   020B ED 6F       	RLD
+0862   020D 23          	INC	HL
+0863   020E ED 6F       	RLD
+0864   0210 CD F8 03    	CALL	MEMDP1		;Display the address and its
+0865   0213             				;data.  Also, set STATE to 1.
+0866   0213 C9          	RET
+0867   0214             ;
+0868   0214             HRGAD:
+0869   0214             HRGFIX:
+0870   0214 79          	LD	A, C
+0871   0215 DD 21 B6 1F 	LD	IX, DISPBF
+0872   0219 21 E3 1F    	LD	HL, STMINOR
+0873   021C 87          	ADD	A, A		;The key-code is the register
+0874   021D             				;name.  Double it and store it
+0875   021D 77          	LD	(HL), A		;into STMINOR.
+0876   021E             
+0877   021E CD 69 04    	CALL	REGDP8		;Display register and set
+0878   0221             				;STATE to 8. (RGAD)
+0879   0221 C9          	RET
+0880   0222             ;
+0881   0222             HRT:
+0882   0222             HWT:
+0883   0222             HRL:
+0884   0222 CD 4B 04    HMV:	CALL	LOCSTBF		;Use STMINOR and STEPBF
+0885   0225             				;to calculate the address
+0886   0225             				;of current parameter in
+0887   0225             				;step buffer.
+0888   0225 CD F0 03    	CALL	PRECL2		;If this is the first hex
+0889   0228             				;key entered, clear the
+0890   0228             				;parameter (2 bytes) by
+0891   0228             				;PRECL2.
+0892   0228 79          	LD	A, C		;C contains the key-code
+0893   0229 ED 6F       	RLD			;Rotate the parameter (2 bytes)
+0894   022B             				;1 digit left with the key-code.
+0895   022B             
+0896   022B 23          	INC	HL
+0897   022C ED 6F       	RLD
+0898   022E CD 30 04    	CALL	STEPDP		;Display the parameter.
+0899   0231 C9          	RET
+0900   0232             ;
+0901   0232 CD B1 04    HRGDA	CALL	LOCRGBF		;Calculate the address of
+0902   0235             				;the register being modified.
+0903   0235 CD E4 03    	CALL	PRECL1		;If this is the first hex
+0904   0238             				;key entered.  Clear the register
+0905   0238             				;(1 byte) by PRECL1.
+0906   0238 79          	LD	A, C		;C contains the key-code
+0907   0239 ED 6F       	RLD			;Rotate user's register (1 byte)
+0908   023B             				;1 digit left with the key-code.
+0909   023B             
+0910   023B CD 6D 04    	CALL	REGDP9		;Display the register and set
+0911   023E             				;STATE to 9 (RGDA).
+0912   023E C9          	RET
+0913   023F             ;
+0914   023F             ;***********************************************************
+0915   023F              ;The following routines with name
+0916   023F              ;I???? are the service routines for
+0917   023F              ;'+' key corresponding to each STATE
+0918   023F              ;They are all branched by table ITAB
+0919   023F              ;and STATE
+0920   023F             
+0921   023F             IFIX:
+0922   023F             IRGFIX:
+0923   023F C3 B1 03    	JP	IGNORE		;'+' key is illegal for state
+0924   0242             				;FIX or RGFIX, ignore it.
+0925   0242             ;
+0926   0242             IAD:
+0927   0242 2A DE 1F    IDA:	LD	HL, (ADSAVE)	;Increase the address being
+0928   0245             				;displayed now (in ADSAVE)
+0929   0245             				;by 1.
+0930   0245 23          	INC	HL
+0931   0246 22 DE 1F    	LD	(ADSAVE), HL
+0932   0249 CD 01 04    	CALL	MEMDP2		;Display the address and data,
+0933   024C             				;then set the STATE to 2 (DA).
+0934   024C C9          	RET
+0935   024D             ;
+0936   024D             IRT:
+0937   024D             IWT:
+0938   024D             IRL:
+0939   024D 21 E3 1F    IMV:	LD	HL, STMINOR	;STMINOR contains the
+0940   0250             				;parameter count, increment
+0941   0250             				;it by one.
+0942   0250 34          	INC	(HL)
+0943   0251 CD 55 04    	CALL	LOCSTNA		;Check if the count is
+0944   0254             				;overflowed.
+0945   0254 20 04       	JR	NZ, ISTEP	;If not overflowed, continue
+0946   0256             				;at ISTEP
+0947   0256 35          	DEC	(HL)		;Otherwise, restore the count
+0948   0257             				;and ignore the '+' key.
+0949   0257 C3 B1 03    	JP	IGNORE
+0950   025A CD 30 04    ISTEP	CALL	STEPDP		;Display the parameter at
+0951   025D             				;step buffer.
+0952   025D C9          	RET
+0953   025E             ;
+0954   025E             IRGAD:
+0955   025E 21 E3 1F    IRGDA:	LD	HL, STMINOR	;In these states, the STMINOR
+0956   0261             				;contains the register name.
+0957   0261             				;Increase it by 1.  If it
+0958   0261             				;reaches the last one, reset
+0959   0261             				;it to the first one (0).
+0960   0261 34          	INC	(HL)
+0961   0262 3E 1F       	LD	A, 1FH
+0962   0264 BE          	CP	(HL)
+0963   0265 30 02       	JR	NC, IRGNA
+0964   0267 36 00       	LD	(HL), 0
+0965   0269 CD 6D 04    IRGNA	CALL	REGDP9		;Display the register and
+0966   026C             				;set STATE to 9
+0967   026C C9          	RET
+0968   026D             ;
+0969   026D             ;***********************************************************
+0970   026D              ;The following routines with name
+0971   026D              ;D???? are the service routines for
+0972   026D              ;'-' key corresponding to each state.
+0973   026D              ;They are all branched by table DTAB
+0974   026D              ;and STATE.
+0975   026D             
+0976   026D             DFIX:
+0977   026D             DRGFIX:
+0978   026D C3 B1 03    	JP	IGNORE		;'-' key is illegal for
+0979   0270             				;these states.  Ignore it.
+0980   0270             ;
+0981   0270             DAD:
+0982   0270 2A DE 1F    DDA:	LD	HL, (ADSAVE)	;Decrease the address being
+0983   0273             				;displayed now (in ADSAVE)
+0984   0273             				;by one.
+0985   0273 2B          	DEC	HL
+0986   0274 22 DE 1F    	LD	(ADSAVE), HL
+0987   0277 CD 01 04    	CALL	MEMDP2		;Display the address and data,
+0988   027A             				;set STATE to 2 (DA).
+0989   027A C9          	RET
+0990   027B             ;
+0991   027B             DRT:
+0992   027B             DWT:
+0993   027B             DRL:
+0994   027B 21 E3 1F    DMV:	LD	HL, STMINOR	;In these states, STMINOR
+0995   027E             				;contains the parameter count.
+0996   027E             				;Decrease it by one.  If overflow
+0997   027E             				;occurs, restore STMINOR and
+0998   027E             				;ignore the '-' key.  Otherwise continue at DSTEP.
+0999   027E             
+1000   027E 35          	DEC	(HL)
+1001   027F CD 55 04    	CALL	LOCSTNA
+1002   0282 20 04       	JR	NZ, DSTEP
+1003   0284 34          	INC	(HL)
+1004   0285 C3 B1 03    	JP	IGNORE
+1005   0288 CD 30 04    DSTEP	CALL	STEPDP		;Display the parameter.
+1006   028B C9          	RET
+1007   028C             ;
+1008   028C             DRGAD:
+1009   028C 21 E3 1F    DRGDA:	LD	HL, STMINOR	;In these states, STMINOR
+1010   028F             				;contains the register name.
+1011   028F             				;Decrease it by one.  If it
+1012   028F             				;goes below zero,  set it to
+1013   028F             				;the highest value (1F).
+1014   028F 35          	DEC	(HL)
+1015   0290 3E 1F       	LD	A, 01FH
+1016   0292 BE          	CP	(HL)
+1017   0293 30 02       	JR	NC, DRGNA
+1018   0295 36 1F       	LD	(HL), 1FH
+1019   0297 CD 6D 04    DRGNA	CALL	REGDP9		;Display the register and
+1020   029A             				;set STATE to 9.
+1021   029A C9          	RET
+1022   029B             ;
+1023   029B             ;***********************************************************
+1024   029B              ;The following routines with name
+1025   029B              ;G???? are the service routines for
+1026   029B              ;'GO' key corresponding to each
+1027   029B              ;state.  They are all branced by
+1028   029B              ;table GTAB and STATE.
+1029   029B             
+1030   029B             GFIX:
+1031   029B             GRGFIX:
+1032   029B             GRGAD:
+1033   029B C3 B1 03    GRGDA:	JP	IGNORE		;'GO' key is illegal for
+1034   029E             				;these states.  Ignore it.
+1035   029E             ;
+1036   029E             GAD:
+1037   029E 2A E0 1F    GDA:	LD	HL, (BRAD)	;Get the address of break
+1038   02A1             				;point.
+1039   02A1 36 EF       	LD	(HL), 0EFH	;Instruction RST28H.
+1040   02A3             				;The content of break address
+1041   02A3             				;ischanged to RST 28H before
+1042   02A3             				;the control is transfered to
+1043   02A3             				;user's program.  THis
+1044   02A3             				;will cause a trap when user's
+1045   02A3             				;PC passes this point.
+1046   02A3 3E FF       	LD	A, 0FFH		;Save FF into TEMP.  This data
+1047   02A5             				;will be output to port C later.
+1048   02A5             				;FF is used to disable break point.
+1049   02A5 32 EA 1F    PREOUT	LD	(TEMP), A	;Store A into TEMP.
+1050   02A8 3A D2 1F    	LD	A, (USERIF)	;Save two instructions into
+1051   02AB             				;TEMP and TEMP+1.  THese two
+1052   02AB             				;instructions will be executed
+1053   02AB             				;later.  If the user's IFF
+1054   02AB             				;(interrupt flip-flop) is 1,
+1055   02AB             				;the instructions are 'EI RET'.
+1056   02AB             				;Otherwise, they are 'DI RET'.
+1057   02AB CB 47       	BIT	0, A
+1058   02AD 21 FB C9    	LD	HL, 0C9FBH	;'EI', 'RET'
+1059   02B0 20 02       	JR	NZ, EIDI
+1060   02B2 2E F3       	LD	L, 0F3H		;'DI'
+1061   02B4 22 EB 1F    EIDI	LD	(TEMP+1), HL
+1062   02B7 31 BC 1F    	LD	SP, REGBF	;Restore user's registers by
+1063   02BA             				;setting SP to REGBF (register
+1064   02BA             				;buffer) and continuously popping
+1065   02BA             				;the stack.
+1066   02BA F1          	POP	AF
+1067   02BB C1          	POP	BC
+1068   02BC D1          	POP	DE
+1069   02BD E1          	POP	HL
+1070   02BE 08          	EX	AF, AF'
+1071   02BF F1          	POP	AF
+1072   02C0 08          	EX	AF, AF'
+1073   02C1 D9          	EXX
+1074   02C2 C1          	POP	BC
+1075   02C3 D1          	POP	DE
+1076   02C4 E1          	POP	HL
+1077   02C5 D9          	EXX
+1078   02C6 DD E1       	POP	IX
+1079   02C8 FD E1       	POP	IY
+1080   02CA ED 7B D0 1F 	LD	SP, (USERSP)	;Restore user's SP.
+1081   02CE 32 BD 1F    	LD	(USERAF+1), A	;Temporarily save A
+1082   02D1 3A D3 1F    	LD	A, (USERIF+1)	;Restore user's I
+1083   02D4 ED 47       	LD	I, A
+1084   02D6             				;The next 3 instructions
+1085   02D6 E5          	PUSH	HL		;push the address being
+1086   02D7             				;displayed now (in ADSAVE)
+1087   02D7             				;onto stack without changing
+1088   02D7             				;HL register.  This address will be
+1089   02D7             				;treated as user's new PC.
+1090   02D7 2A DE 1F    	LD	HL, (ADSAVE)
+1091   02DA E3          	EX	(SP), HL
+1092   02DB 3A EA 1F    	LD	A, (TEMP)	;Output the data stored in
+1093   02DE             				;TEMP to port C of 8255
+1094   02DE             				;This data is prepared by
+1095   02DE             				;routine KSTEP or GAD or
+1096   02DE             				;GDA.  In first case, it is
+1097   02DE             				;10111111 and will enable
+1098   02DE             				;break point.  In other
+1099   02DE             				;cases, it is FF and will
+1100   02DE             				;disable break point.
+1101   02DE             				;If break is enabled, non-
+1102   02DE             				;maskable interrupt will occur
+1103   02DE             				;5 M1's after the OUT instruction.
+1104   02DE D3 01       	OUT	(DIGIT), A
+1105   02E0 3A BD 1F    	LD	A, (USERAF+1)	;1st M1,
+1106   02E3             				;Restore A register.
+1107   02E3 C3 EB 1F    	JP	TEMP+1		;2nd M1,
+1108   02E6             				;Execute the two instructions
+1109   02E6             				;stored in RAM.  They are:
+1110   02E6             				;    EI (or DI)     ;3rd M1
+1111   02E6             				;    RET            ;4th M1
+1112   02E6             				;The starting address of user's
+1113   02E6             				;program has been pushed onto
+1114   02E6             				;the top of the stack.  RET pops
+1115   02E6             				;out this address and transfers
+1116   02E6             				;control to it.  The first M1
+1117   02E6             				;of user's program will be the
+1118   02E6             				;5th M1 after OUT. If break point
+1119   02E6             				;is enabled, NMI will occur after
+1120   02E6             				;this instruction is completed.		(Editor's comment: First/current instruction of user's program)
+1121   02E6             				;This is the mechanism of single
+1122   02E6             				;step.
+1123   02E6             ;
+1124   02E6             ;***********************************************************
+1125   02E6 21 AF 1F    GMV	LD	HL, STEPBF
+1126   02E9 CD 33 05    	CALL	GETP		;Load parameters from
+1127   02EC             				;step buffer into registers.
+1128   02EC             				;Also check if the parameters
+1129   02EC             				;are legal.  After GETP,
+1130   02EC             				;HL = start address of source
+1131   02EC             				;BC = length to MOVE.
+1132   02EC 38 56       	JR	C, ERROR	;Jump to ERROR if the
+1133   02EE             				;parameters are illegal. (I.e., Ending
+1134   02EE             				;address < starting address.)
+1135   02EE ED 5B B3 1F 	LD	DE, (STEPBF+4)	;Load destination
+1136   02F2             				;address into DE.
+1137   02F2 ED 52       	SBC	HL, DE		;Compare HL and DE to
+1138   02F4             				;determine move up or down.
+1139   02F4 30 0C       	JR	NC, MVUP
+1140   02F6             				;Move down:
+1141   02F6 EB          	EX	DE, HL		;HL = destination address
+1142   02F7 09          	ADD	HL, BC		;HL = dest. address + length
+1143   02F8 2B          	DEC	HL		;HL = end address of dest.
+1144   02F9 EB          	EX	DE, HL		;DE = end address of dest.
+1145   02FA 2A B1 1F    	LD	HL, (STEPBF+2)	;HL = end address of source
+1146   02FD ED B8       	LDDR			;block transfer instruction
+1147   02FF 13          	INC	DE		;DE = last address moved
+1148   0300 18 1C       	JR	ENDFUN		;Continue at ENDFUN
+1149   0302             MVUP:				;Move up:
+1150   0302 19          	ADD	HL, DE		;HL is destroyed by
+1151   0303             				;SBC HL, DE.  Restore HL.
+1152   0303 ED B0       	LDIR			;block transfer
+1153   0305 1B          	DEC	DE		;DE = last address moved
+1154   0306 18 16       	JR	ENDFUN		;Continue at ENDFUN
+1155   0308             ;
+1156   0308             ;***********************************************************
+1157   0308 ED 5B AF 1F GRL	LD	DE, (STEPBF)	;Load starting address
+1158   030C             				;into DE.
+1159   030C 13          	INC	DE		;Increase this address by 2.
+1160   030D             				;Relative address is used in
+1161   030D             				;instruction JR or DJNZ.
+1162   030D             				;The codes for them are 2 bytes.
+1163   030D             				;The PC is increased by 2 after
+1164   030D             				;opcode is fetched.
+1165   030D 13          	INC	DE
+1166   030E 2A B1 1F    	LD	HL, (STEPBF+2)	;Load destination
+1167   0311             				;address into HL.
+1168   0311 B7          	OR	A
+1169   0312 ED 52       	SBC	HL, DE		;Calculate difference.
+1170   0314 7D          	LD	A, L		;Check if the offset is between
+1171   0315             				;+127 (007FH) and -128 (FF80H).
+1172   0315             				;If the offset is positive, both H
+1173   0315             				;and bit 7 of L must be zero; if it
+1174   0315             				;is negative, H and bit 7 of L must
+1175   0315             				;be FF and 1.  In both cases, adding
+1176   0315             				;H with bit 7 of L results in 0.
+1177   0315 17          	RLA			;Rotate bit 7 of L into carry flag.
+1178   0316 7C          	LD	A, H
+1179   0317 CE 00       	ADC	A, 0		;ADD H and bit 7 of L.
+1180   0319 20 29       	JR	NZ, ERROR	;Branch to ERROR if
+1181   031B             				;the results is nonzero.
+1182   031B 7D          	LD	A, L
+1183   031C 1B          	DEC	DE
+1184   031D 12          	LD	(DE), A		;Save the offset into
+1185   031E             				;the next byte of opcode.
+1186   031E             				;(DJNZ or JR)
+1187   031E             ;
+1188   031E             ENDFUN:
+1189   031E ED 53 DE 1F 	LD	(ADSAVE), DE	;Save DE into ADSAVE.
+1190   0322 CD 01 04    	CALL	MEMDP2		;Display this address and
+1191   0325             				;its data.  Set STATE to 2.
+1192   0325 C9          	RET
+1193   0326             ;
+1194   0326             ;***********************************************************
+1195   0326             GWT:
+1196   0326 CD 23 05    	CALL	SUM1		;Load parameters from
+1197   0329             				;step buffer into registers.
+1198   0329             				;Check if the parameters
+1199   0329             				;are legal.  If legal, calculate
+1200   0329             				;the sum of all data to be output
+1201   0329             				;to tape.
+1202   0329 38 19       	JR	C, ERROR	;Branch to ERROR if the
+1203   032B             				;parameters are illegal. (length is
+1204   032B             				;negative)
+1205   032B             
+1206   032B 3E FF               LD A,0FFH
+1207   032D CD 61 08    	CALL COUT
+1208   0330             
+1209   0330 06 00               LD B,0
+1210   0332 10 FE               DJNZ $
+1211   0334             
+1212   0334 CD 13 09    	CALL   UPLOAD_HEX
+1213   0337             
+1214   0337 DD 21 9F 07 END_SERIAL LD	IX,MPF_I  	;IX points to '-Err  '
+1215   033B C3 D2 00    	JP	SETST0		;Set STATE to 0 by
+1216   033E             				;branching to SETST0.
+1217   033E             	
+1218   033E             
+1219   033E             	
+1220   033E ED 5B B3 1F ENDTAPE	LD	DE, (STEPBF+4)	;DE = last address
+1221   0342 18 DA       	JR	ENDFUN		;Continue at ENDFUN
+1222   0344             ;
+1223   0344 DD 21 A9 07 ERROR	LD	IX, ERR_	;IX points to '-Err  '
+1224   0348 C3 D2 00    	JP	SETST0		;Set STATE to 0 by
+1225   034B             				;branching to SETST0.
+1226   034B             ;
+1227   034B             ;***********************************************************
+1228   034B             GRT:
+1229   034B 2A AF 1F    	LD	HL, (STEPBF)	;Temporarily save filename.
+1230   034E 22 EA 1F    	LD	(TEMP), HL
+1231   0351 3E 40       LEAD	LD	A, 01000000B	;decimal point
+1232   0353 D3 02       	OUT	(SEG7), A	;When searching for filename,
+1233   0355             				;the display is blank initially.
+1234   0355             				;If the data read from MIC is
+1235   0355             				;acceptable 0 or 1, the display
+1236   0355             				;becomes '......'.
+1237   0355             
+1238   0355 CD A0 09    	CALL GET_RECORD
+1239   0358 18 DD       	JR END_SERIAL
+1240   035A             
+1241   035A             
+1242   035A 21 E8 03    	LD	HL, 1000
+1243   035D CD 82 05    LEAD1	CALL	PERIOD		;The return of PERIOD
+1244   0360             				;is in flag:
+1245   0360             				;  NC -- tape input is 1 kHz;
+1246   0360             				;   C -- otherwise.
+1247   0360 38 EF       	JR	C, LEAD		;Loop until leading sync.
+1248   0362             				;is detected.
+1249   0362 2B          	DEC	HL		;Decrease HL by one when
+1250   0363             				;one period is detected.
+1251   0363 7C          	LD	A, H
+1252   0364 B5          	OR	L		;Check if both H and L are 0.
+1253   0365 20 F6       	JR	NZ, LEAD1	;Wait for 1000 periods.
+1254   0367             				;The leading sync. is accepted
+1255   0367             				;if it is longer than 1000
+1256   0367             				;cycles (1 second).
+1257   0367 CD 82 05    LEAD2	CALL	PERIOD
+1258   036A 30 FB       	JR	NC, LEAD2	;Wait all leading sync. to
+1259   036C             				;pass over.
+1260   036C             ;
+1261   036C 21 AF 1F    	LD	HL, STEPBF	;Load 7 bytes from
+1262   036F             				;tape into STEPBF.
+1263   036F 01 07 00    	LD	BC, 7
+1264   0372 CD 43 05    	CALL	TAPEIN
+1265   0375 38 DA       	JR	C, LEAD		;Jump to LEAD if input
+1266   0377             				;is not succesful.
+1267   0377 ED 5B AF 1F 	LD	DE, (STEPBF)	;Get filename from
+1268   037B             				;step buffer.
+1269   037B CD 65 06    	CALL	ADDRDP		;Convert it to display
+1270   037E             				;format.
+1271   037E 06 96       	LD	B, 150		;Display it for 1.5 sec.
+1272   0380 CD 24 06    FILEDP	CALL	SCAN1
+1273   0383 10 FB       	DJNZ	FILEDP
+1274   0385 2A EA 1F    	LD	HL, (TEMP)	;Check if the input
+1275   0388             				;filename equals to the
+1276   0388             				;specified filename.
+1277   0388 B7          	OR	A
+1278   0389 ED 52       	SBC	HL, DE
+1279   038B 20 C4       	JR	NZ, LEAD	;If not, find the leading
+1280   038D             				;sync. of next file.
+1281   038D             
+1282   038D             				;If filename is found
+1283   038D 3E 02       	LD	A, 00000010B	;segment '-'
+1284   038F D3 02       	OUT	(SEG7), A	;Display '------'.
+1285   0391 CD 30 05    	CALL	GETPTR		;The parameters (starting,
+1286   0394             				;ending address and check-
+1287   0394             				;sum) have been loaded into
+1288   0394             				;STEPBF.  Load them into
+1289   0394             				;registers, calculate the block
+1290   0394             				;length and check if they are
+1291   0394             				;legal.
+1292   0394 38 AE       	JR	C, ERROR	;Jump to ERROR if the
+1293   0396             				;parameters are illegal.
+1294   0396 CD 43 05    	CALL	TAPEIN		;Input user's data.
+1295   0399 38 A9       	JR	C, ERROR	;Jump to ERROR if input
+1296   039B             				;is not succesful.
+1297   039B CD 23 05    	CALL	SUM1		;Calculate the sum of all
+1298   039E             				;input data.
+1299   039E 21 B5 1F    	LD	HL, STEPBF+6
+1300   03A1 BE          	CP	(HL)		;Compare it with the
+1301   03A2             				;checksum calculated and stored by
+1302   03A2             				;'WRtape'.
+1303   03A2 20 A0       	JR	NZ, ERROR	;Jump to ERROR if not
+1304   03A4             				;matched.
+1305   03A4 18 98       	JR	ENDTAPE		;Continue at ENDTAPE.
+1306   03A6             ;
+1307   03A6             ;***********************************************************
+1308   03A6             BRANCH:
+1309   03A6             ;Branch table format:
+1310   03A6             ;   byte 1,2 : address of the 1st routine in
+1311   03A6             ;              each group.
+1312   03A6             ;   byte 3   : difference between the address
+1313   03A6             ;              of 1st and 1st routine, which is
+1314   03A6             ;              of course 0.
+1315   03A6             ;   byte 4   : difference between the address
+1316   03A6             ;              of 2nd and 1st routine
+1317   03A6             ;   byte 5   : difference between the address
+1318   03A6             ;              of 3rd and 1st routine
+1319   03A6             ;    ...
+1320   03A6             ;    ...
+1321   03A6             ;    ...
+1322   03A6             ; HL : address of branch table
+1323   03A6             ; A  : the routine number in its group
+1324   03A6             ; Such branch tables can save table length and avoid page
+1325   03A6             ; (256 bytes) boundary problems.
+1326   03A6             
+1327   03A6 5E          	LD	E, (HL)		;Load the address of 1st
+1328   03A7             				;routine in the group into
+1329   03A7             				;DE register.
+1330   03A7 23          	INC	HL
+1331   03A8 56          	LD	D, (HL)
+1332   03A9 23          	INC	HL		;Locate the pointer of difference
+1333   03AA             				;table.
+1334   03AA 85          	ADD	A, L
+1335   03AB 6F          	LD	L, A
+1336   03AC 6E          	LD	L, (HL)		;Load the address
+1337   03AD             				;difference into L.
+1338   03AD 26 00       	LD	H, 0
+1339   03AF 19          	ADD	HL, DE		;Get routine's real address
+1340   03B0 E9          	JP	(HL)		;Jump to it.
+1341   03B1             ;
+1342   03B1             ;***********************************************************
+1343   03B1             IGNORE:
+1344   03B1 21 E6 1F    	LD	HL, TEST
+1345   03B4 CB FE       	SET	7, (HL)		;Routine SCAN will check bit
+1346   03B6             				;7 of TEST.  If it is set,
+1347   03B6             				;all LEDs will be disabled.
+1348   03B6             				;This is a warning message to
+1349   03B6             				;the user when a illegal key
+1350   03B6             				;is entered.
+1351   03B6 C9          	RET
+1352   03B7             ;
+1353   03B7             ;***********************************************************
+1354   03B7             INI:
+1355   03B7             ; Power-up initialization.
+1356   03B7 DD 21 A5 07 	LD	IX, BLANK	;BLANK is the initial display
+1357   03BB             				;pattern.
+1358   03BB             				;Display the following
+1359   03BB             				;patterns sequence, each 0.16
+1360   03BB             				;seconds:
+1361   03BB             				;    '      '
+1362   03BB             				;    '     u'
+1363   03BB             				;    '    uP'
+1364   03BB             				;    '   uPF'
+1365   03BB             				;    '  uPF-'
+1366   03BB             				;    ' uPF--'
+1367   03BB             				;    'uPF--1'
+1368   03BB             
+1369   03BB 0E 07       	LD	C, 7		;pattern count
+1370   03BD 06 10       INI1	LD	B, 16		;Display 0.16 second.
+1371   03BF CD 24 06    INI2	CALL	SCAN1
+1372   03C2 10 FB       	DJNZ	INI2
+1373   03C4 DD 2B       	DEC	IX		;next pattern
+1374   03C6 0D          	DEC	C
+1375   03C7 20 F4       	JR	NZ, INI1
+1376   03C9             ;
+1377   03C9 3E A5       	LD	A, PWCODE
+1378   03CB C3 B3 06    	JP	INI3
+1379   03CE 21 66 00    INI4	LD	HL, NMI
+1380   03D1 22 EE 1F    	LD	(IM1AD), HL	;Set the service routine
+1381   03D4             				;of RST 38H to NMI, which is the
+1382   03D4             				;nonmaskable interrupt service
+1383   03D4             				;routine for break point and
+1384   03D4             				;single step.
+1385   03D4             CLRBR:
+1386   03D4             ; Clear break point by setting
+1387   03D4             ; the break point address to
+1388   03D4             ; FFFF.  This is a non-existant
+1389   03D4             ; address, so break can never
+1390   03D4             ; happen.
+1391   03D4             
+1392   03D4 21 FF FF    	LD	HL, 0FFFFH
+1393   03D7 22 E0 1F    	LD	(BRAD), HL
+1394   03DA C9          	RET
+1395   03DB             ;
+1396   03DB             TESTM:
+1397   03DB             ; Check if the display is of 'addres-data'
+1398   03DB             ; form, i.e. STATE 1 or 2.
+1399   03DB             ; The result is stored in zero flag.
+1400   03DB             ;   Z:	yes
+1401   03DB             ;  NZ:	no
+1402   03DB             
+1403   03DB 3A E4 1F    	LD	A, (STATE)
+1404   03DE FE 01       	CP	1
+1405   03E0 C8          	RET	Z
+1406   03E1 FE 02       	CP	2
+1407   03E3 C9          	RET
+1408   03E4             ;
+1409   03E4             PRECL1:
+1410   03E4             ; Pre-clear 1 byte.
+1411   03E4             ; If bit 0 of TEST is not 0, load 0 into (HL).  Bit 0 of
+1412   03E4             ; TEST is cleared after check.
+1413   03E4             ; Only AF register is destroyed.
+1414   03E4             
+1415   03E4 3A E6 1F    	LD	A, (TEST)
+1416   03E7 B7          	OR	A		;Is bit 0 of TEST zero?
+1417   03E8 C8          	RET	Z
+1418   03E9 3E 00       	LD	A, 0
+1419   03EB 77          	LD	(HL), A		;Clear (HL)
+1420   03EC 32 E6 1F    	LD	(TEST), A	;Clear TEST too.
+1421   03EF C9          	RET
+1422   03F0             ;
+1423   03F0             PRECL2:
+1424   03F0             ; Pre-clear 2 bytes.
+1425   03F0             ; If bit 0 of TEST is nonzero, clear (HL)
+1426   03F0             ; and (HL+1).
+1427   03F0             ; Only AF register is destroyed.
+1428   03F0             
+1429   03F0 CD E4 03    	CALL	PRECL1
+1430   03F3 C8          	RET	Z
+1431   03F4 23          	INC	HL
+1432   03F5 77          	LD	(HL), A
+1433   03F6 2B          	DEC	HL
+1434   03F7 C9          	RET
+1435   03F8             ;
+1436   03F8             ;***********************************************************
+1437   03F8             ; Memory display format: (address-data)
+1438   03F8             
+1439   03F8             ;      i) A.A.A.A. D D -- State is AD.  Four decimal points
+1440   03F8             ;                         under the address field indicate
+1441   03F8             ;                         that the numeric key entered will
+1442   03F8             ;                         be interpreted as memory address.
+1443   03F8             ;     ii) A A A A  D.D.-- State is DA.  Two decimal points
+1444   03F8             ;                         under the data field indicate
+1445   03F8             ;                         the monitor is expecting user to
+1446   03F8             ;                         enter memory data.
+1447   03F8             ;    iii) A.A.A.A. D.D.-- Six decimal points indicate the
+1448   03F8             ;                         address being displayed is set
+1449   03F8             ;                         as a break point.
+1450   03F8             
+1451   03F8             MEMDP1:
+1452   03F8 3E 01       	LD	A, 1		;Next STATE = 1
+1453   03FA 06 04       	LD	B, 4		;4 decimal points active
+1454   03FC 21 B8 1F    	LD	HL, DISPBF+2	;The first active decimal
+1455   03FF             				;point is in DISPBF+2, the
+1456   03FF             				;last in DISPBF+5.
+1457   03FF 18 07       	JR	SAV12		;Continue at SAV12.
+1458   0401             MEMDP2:
+1459   0401 3E 02       	LD	A, 2		;Next STATE = 2
+1460   0403 06 02       	LD	B, 2		;2 active decimal points
+1461   0405 21 B6 1F    	LD	HL, DISPBF	;1st decimal point is in
+1462   0408             				;DISPBF, 2nd in DISPBF+1.
+1463   0408 32 E4 1F    SAV12	LD	(STATE), A	;Update STATE
+1464   040B D9          	EXX			;Save register HL, BC, DE
+1465   040C ED 5B DE 1F 	LD	DE, (ADSAVE)	;The address to be
+1466   0410             				;displayed is stored in
+1467   0410             				;(ADSAVE).  Load it into
+1468   0410             				;DE register.
+1469   0410 CD 65 06    	CALL	ADDRDP		;Convert this address to
+1470   0413             				;display format and store it
+1471   0413             				;into DISPBF+2 - DISPBF+5.
+1472   0413 1A          	LD	A, (DE)		;Load the data of this
+1473   0414             				;address into A register
+1474   0414 CD 71 06    	CALL	DATADP		;Convert this data to
+1475   0417             				;display format and store it
+1476   0417             				;into DISPBF - DISPBF+1
+1477   0417             BRTEST:
+1478   0417             ; The next 3 instructions serve to refresh the
+1479   0417             ; data at break address every time memory is
+1480   0417             ; displayed.
+1481   0417 2A E0 1F    	LD	HL, (BRAD)	;Get break point address.
+1482   041A 7E          	LD	A, (HL)		;Get the data of this
+1483   041B             				;address into A register.
+1484   041B 32 E2 1F    	LD	(BRDA), A	;Store it into BRDA (break data).
+1485   041E B7          	OR	A
+1486   041F ED 52       	SBC	HL, DE		;Check if the address to
+1487   0421             				;be displayed is break point.
+1488   0421 20 06       	JR	NZ, SETPT1	;If not, jump to SETPT1.
+1489   0423 06 06       	LD	B, 6		;6 active decimal points.
+1490   0425 21 B6 1F    	LD	HL, DISPBF	;1st decimal point is in
+1491   0428             				;DISPBF; 6th in DISPBF+5.
+1492   0428 D9          	EXX
+1493   0429 D9          SETPT1	EXX
+1494   042A CB F6       SETPT	SET	6,(HL)		;Set decimal points.
+1495   042C             				;Count in B, first address
+1496   042C             				;in HL register.
+1497   042C 23          	INC	HL
+1498   042D 10 FB       	DJNZ	SETPT
+1499   042F C9          	RET
+1500   0430             ;
+1501   0430             ;***********************************************************
+1502   0430             ; Step display format: (this format is used when user is
+1503   0430             ; entering parameters for Move, Rela, WRtape, RDtape.)
+1504   0430             
+1505   0430             ;         P.P.P.P. - N
+1506   0430             
+1507   0430             ; 'P' is the digit of parameter.  Four decimal points
+1508   0430             ; indicate P's are being modified now.  N is the mnemonic of
+1509   0430             ; the parameter:
+1510   0430             ;      i) Move   S -- starting address
+1511   0430             ;                E -- ending address
+1512   0430             ;                D -- destination address
+1513   0430             ;     ii) Rela   S -- source address
+1514   0430             ;                D -- destination address
+1515   0430             ;    iii) WRtape F -- file name
+1516   0430             ;                S -- starting address
+1517   0430             ;                E -- ending address
+1518   0430             ;     iv) Rdtape F -- filename
+1519   0430             
+1520   0430             STEPDP:
+1521   0430             ;Display step buffer and its parameter name.
+1522   0430             ;Input:	STATE
+1523   0430             ;	STMINOR (parameter count)
+1524   0430             ;registers destroyed: AF, BC, DE, HL
+1525   0430             
+1526   0430 CD 4B 04    	CALL	LOCSTBF		;Get parameter address
+1527   0433 5E          	LD	E, (HL)		;Load parameter into DE
+1528   0434 23          	INC	HL
+1529   0435 56          	LD	D, (HL)
+1530   0436 CD 65 06    	CALL	ADDRDP		;Convert this paramter to
+1531   0439             				;display format (4 digits)
+1532   0439             				;and store it into DISPBF+2
+1533   0439             				; - DISPBF+5
+1534   0439 21 B8 1F    	LD	HL, DISPBF+2	;Set 4 decimal points
+1535   043C             				;From DISPBF+2 to DISPBF+5
+1536   043C 06 04       	LD	B, 4
+1537   043E CD 2A 04    	CALL	SETPT
+1538   0441 CD 55 04    	CALL	LOCSTNA		;Get parameter name.
+1539   0444 6F          	LD	L, A
+1540   0445 26 02       	LD	H, 2		;Pattern '-' for 2nd rightmost
+1541   0447             				;digit.
+1542   0447 22 B6 1F    	LD	(DISPBF), HL
+1543   044A C9          	RET
+1544   044B             ;
+1545   044B             LOCSTBF:
+1546   044B             ;Get the location of paramter.
+1547   044B             ; address = STEPBF + STMINOR*2
+1548   044B             ;registers destroyed: AF, HL
+1549   044B             
+1550   044B 3A E3 1F    	LD	A, (STMINOR)	;Get parameter count.
+1551   044E 87          	ADD	A, A		;Each parameter has 2 bytes
+1552   044F 21 AF 1F    	LD	HL, STEPBF	;Get base address
+1553   0452 85          	ADD	A, L
+1554   0453 6F          	LD	L, A
+1555   0454 C9          	RET
+1556   0455             ;
+1557   0455             LOCSTNA
+1558   0455              ;Get parameter name.
+1559   0455              ;Input: STATE, STMINOR
+1560   0455              ;Output: parameter name in A, and Z flag.
+1561   0455             
+1562   0455              ;registers destroyed: AF, DE
+1563   0455 3A E4 1F    	LD	A, (STATE)	;Get STATE.
+1564   0458             				;Possible states are:
+1565   0458             				;4,5,6,7. (Move, Rel,
+1566   0458             				;WRtape, RDtape)
+1567   0458 D6 04       	SUB	4		;Change 4,5,6,7 to
+1568   045A             				;0,1,2,3
+1569   045A 87          	ADD	A, A		;Each state has 4 bytes for names
+1570   045B 87          	ADD	A, A
+1571   045C 11 BC 07    	LD	DE, STEPTAB
+1572   045F 83          	ADD	A, E
+1573   0460 5F          	LD	E, A		;Now, DE contains the
+1574   0461             				;address of 1st name
+1575   0461             				;for each state.
+1576   0461 3A E3 1F    	LD	A, (STMINOR)	;Get parameter count
+1577   0464 83          	ADD	A, E		;DE <--- DE + A
+1578   0465 5F          	LD	E, A
+1579   0466 1A          	LD	A, (DE)		;Get parameter name.
+1580   0467 B7          	OR	A		;Change zero flag.  If the
+1581   0468             				;returned pattern (in A) is
+1582   0468             				;zero,  the '+' or '-' must
+1583   0468             				;have been pressed beyond legal
+1584   0468             				;parameter boundary. (Check if
+1585   0468             				;parameter name got from STEPTAB
+1586   0468             				;is zero)
+1587   0468 C9          	RET
+1588   0469             ;
+1589   0469             ;***********************************************************
+1590   0469             ; Register display format:
+1591   0469             
+1592   0469             ;       i)  X X X X  Y Y -- State is REGAD.  The numeric data
+1593   0469             ;                           entered is interpreted as 
+1594   0469             ;                           register name.
+1595   0469             ;                           YY is the register name, the
+1596   0469             ;                           data of that register pair is,
+1597   0469             ;                           XXXX.
+1598   0469             
+1599   0469             ;      ii)  X X X.X. Y Y or
+1600   0469             ;     iii)  X.X.X X  Y Y -- State is REGDA.  The unit of
+1601   0469             ;                           register modification is byte.
+1602   0469             ;                           The numeric data enterd will
+1603   0469             ;                           change the byte with decimal
+1604   0469             ;                           points under it.  Decimal points
+1605   0469             ;                           can be moved by '+' and '-' keys.
+1606   0469             
+1607   0469             REGDP8:
+1608   0469             ; Display register and set STATE to 8.
+1609   0469             
+1610   0469 3E 08       	LD	A, 8		;Next state = 8
+1611   046B 18 02       	JR	RGSTIN
+1612   046D             
+1613   046D             REGDP9:
+1614   046D             ; Display register and set STATE to 9
+1615   046D             
+1616   046D 3E 09       	LD	A, 9		;Next state = 9
+1617   046F             
+1618   046F             RGSTIN:
+1619   046F             ; Update STATE by register A.
+1620   046F             ; Display user's  register (count
+1621   046F             ; contained in STMINOR).
+1622   046F             ; registers destroyed: AF, BC, DE, HL
+1623   046F             
+1624   046F 32 E4 1F    	LD	(STATE), A	;Update STATE
+1625   0472 3A E3 1F    	LD	A, (STMINOR)	;Get register coutn.
+1626   0475 CB 87       	RES	0, A		;Registers are displayed by
+1627   0477             				;pairs.  Find the count
+1628   0477             				;of pair leader.  (count of
+1629   0477             				;the lower one)
+1630   0477 47          	LD	B, A		;Temprorarily save A.
+1631   0478 CD A4 04    	CALL	RGNADP		;Find register count.
+1632   047B             				;Store them into DISPBF
+1633   047B             				;and DISPBF+1.
+1634   047B 78          	LD	A, B		;Restore A (register pair leader).
+1635   047C CD B4 04    	CALL	LOCRG		;Get the address of
+1636   047F             				;user's register.
+1637   047F 5E          	LD	E, (HL)		;Get register data. (2 bytes)
+1638   0480 23          	INC	HL
+1639   0481 56          	LD	D, (HL)
+1640   0482 ED 53 DE 1F 	LD	(ADSAVE), DE	;Convert them to display
+1641   0486             				;format and store into
+1642   0486             				;display buffer.
+1643   0486 CD 65 06    	CALL	ADDRDP
+1644   0489 3A E4 1F    	LD	A, (STATE)
+1645   048C FE 09       	CP	9		;If STATE equals to 9 (RGDA),
+1646   048E             				;set 2 decimal points.
+1647   048E             				;Otherwise return here.
+1648   048E C0          	RET	NZ
+1649   048F 21 B8 1F    	LD	HL, DISPBF+2
+1650   0492 3A E3 1F    	LD	A, (STMINOR)	;Get register name.
+1651   0495 CB 47       	BIT	0, A		;If this register is
+1652   0497             				;group leader, set decimal
+1653   0497             				;points of two central digits.
+1654   0497             				;Otherwise set two left digits.
+1655   0497 28 02       	JR	Z, LOCPT
+1656   0499 23          	INC	HL
+1657   049A 23          	INC	HL
+1658   049B CB F6       LOCPT	SET	6, (HL)		;Set decimapl points of
+1659   049D             				;(HL) and (HL+1)
+1660   049D 23          	INC	HL
+1661   049E CB F6       	SET	6, (HL)
+1662   04A0 CD BA 04    	CALL	FCONV		;Convert user's flag (F, F')
+1663   04A3             				;to binary display format.
+1664   04A3 C9          	RET
+1665   04A4             ;
+1666   04A4             RGNADP:
+1667   04A4             ; Get the patterns of register names and
+1668   04A4             ; store them into DISPBF and DISPBF+1.
+1669   04A4             ; Input: A contains register count of
+1670   04A4             ;        pair leader.
+1671   04A4             ; registers destroyed: AF,DE,HL
+1672   04A4             
+1673   04A4 21 D0 07    	LD	HL, RGTAB	;Get address of pattern
+1674   04A7             				;table.
+1675   04A7 85          	ADD	A, L
+1676   04A8 6F          	LD	L, A
+1677   04A9 5E          	LD	E, (HL)		;Get first pattern
+1678   04AA 23          	INC	HL
+1679   04AB 56          	LD	D, (HL)		;Get 2nd pattern.
+1680   04AC ED 53 B6 1F 	LD	(DISPBF), DE
+1681   04B0 C9          	RET
+1682   04B1             ;
+1683   04B1             LOCRGBF:
+1684   04B1             ; Get the address of user's register.
+1685   04B1             ; Register name contained is STMINOR.
+1686   04B1             ; Destroys HL, AF.
+1687   04B1             
+1688   04B1 3A E3 1F    	LD	A, (STMINOR)
+1689   04B4 21 BC 1F    LOCRG	LD	HL, REGBF
+1690   04B7 85          	ADD	A, L
+1691   04B8 6F          	LD	L, A
+1692   04B9 C9          	RET
+1693   04BA             ;
+1694   04BA             FCONV:
+1695   04BA             ; Encode or decode user's flag register.
+1696   04BA             ; STMINOR contains the name of the flag
+1697   04BA             ; being displayed now.
+1698   04BA             ; registers destroyed: AF, BC, HL.
+1699   04BA             
+1700   04BA 3A E3 1F    	LD	A, (STMINOR)	;Get register name.
+1701   04BD B7          	OR	A		;Clear carry flag.
+1702   04BE 1F          	RRA			;name of I register: 17H,
+1703   04BF             				;name of IFF: 16H.
+1704   04BF             				;Rotate right one bit, both
+1705   04BF             				;become 0BH.
+1706   04BF FE 0B       	CP	0BH
+1707   04C1 28 09       	JR	Z, FLAGX	;Jump to FLAGX if
+1708   04C3             				;I or IFF is being
+1709   04C3             				;displayed now.
+1710   04C3 4F          	LD	C, A		;Otherwise, mask out bit
+1711   04C4             				;1 to bit 7 fof user's IFF.
+1712   04C4             				;IFF is only 1 bit, monitor
+1713   04C4             				;uses one byte to store it,
+1714   04C4             				;masking out bit 1-7 is to
+1715   04C4             				;ignore the useless bits.
+1716   04C4             				;This is done only when the
+1717   04C4             				;user is not modifying IFF.
+1718   04C4             				;If user is modifying IFF,
+1719   04C4             				;monitor will display whatever
+1720   04C4             				;he enters, even if bit 1-7
+1721   04C4             				;are not all zero.
+1722   04C4             				;A register is not changed
+1723   04C4             				;after doing this.
+1724   04C4 21 D2 1F    	LD	HL, USERIF
+1725   04C7 7E          	LD	A, (HL)
+1726   04C8 E6 01       	AND	00000001B
+1727   04CA 77          	LD	(HL), A
+1728   04CB 79          	LD	A, C
+1729   04CC FE 0C       FLAGX	CP	0CH		;If STMINOR contains
+1730   04CE             				;the name of SZXH, XPNC,
+1731   04CE             				;SZXH' or XPNC', after
+1732   04CE             				;rotating right one bit
+1733   04CE             				;it will be greater than
+1734   04CE             				;or equal to 0CH.
+1735   04CE             				;Decode user's flag if it
+1736   04CE             				;is not being modified now,
+1737   04CE             				;encode it otherwise.
+1738   04CE 30 1F       	JR	NC, FCONV2
+1739   04D0 3A BC 1F    FCONV1	LD	A, (USERAF)	;Get user's F register
+1740   04D3 CD 0E 05    	CALL	DECODE		;Decode upper 4 bits.
+1741   04D6 22 D4 1F    	LD	(FLAGH), HL
+1742   04D9 CD 0E 05    	CALL	DECODE		;Decode lower 4 bits.
+1743   04DC 22 D6 1F    	LD	(FLAGL), HL
+1744   04DF 3A C4 1F    	LD	A, (UAFP)	;Get user's F' register.
+1745   04E2 CD 0E 05    	CALL	DECODE
+1746   04E5 22 D8 1F    	LD	(FLAGHP), HL
+1747   04E8 CD 0E 05    	CALL	DECODE
+1748   04EB 22 DA 1F    	LD	(FLAGLP), HL
+1749   04EE C9          	RET
+1750   04EF 2A D4 1F    FCONV2	LD	HL, (FLAGH)	;Get the binary form
+1751   04F2             				;of 4 upper bits of
+1752   04F2             				;user's F register.
+1753   04F2 CD 19 05    	CALL	ENCODE		;Encode it.
+1754   04F5 2A D6 1F    	LD	HL, (FLAGL)	;Encode 4 lower bits.
+1755   04F8 CD 19 05    	CALL	ENCODE
+1756   04FB 32 BC 1F    	LD	(USERAF), A	;Save the encoded
+1757   04FE             				;result into USERAF.
+1758   04FE 2A D8 1F    	LD	HL, (FLAGHP)	;Encode F' register.
+1759   0501 CD 19 05    	CALL	ENCODE
+1760   0504 2A DA 1F    	LD	HL, (FLAGLP)
+1761   0507 CD 19 05    	CALL	ENCODE
+1762   050A 32 C4 1F    	LD	(UAFP), A
+1763   050D C9          	RET
+1764   050E             ;
+1765   050E             DECODE:
+1766   050E             ; Decode bit 7-4 of A register.
+1767   050E             ; Each bit is extended to 4 bits.
+1768   050E             ; 0 becomse 0000, 1 becomse 0001.
+1769   050E             ; The output is stored in HL, which
+1770   050E             ; is 16 bits in length.  Also, after
+1771   050E             ; execution, bits 7-4 of A register are
+1772   050E             ; bits 3-0 of A before execution.
+1773   050E             ; Registers destroyed: AF, B, HL
+1774   050E             
+1775   050E 06 04       	LD	B, 4		;Loop 4 times
+1776   0510 29          DRL4	ADD	HL, HL		;Clear rightmost 3
+1777   0511             				;bits of HL.
+1778   0511 29          	ADD	HL, HL
+1779   0512 29          	ADD	HL, HL
+1780   0513 07          	RLCA
+1781   0514 ED 6A       	ADC	HL, HL		;The 4th bit of HL
+1782   0516             				;is determined by carry
+1783   0516             				;flag, which is the MSB
+1784   0516             				;of A register.
+1785   0516 10 F8       	DJNZ	DRL4
+1786   0518 C9          	RET
+1787   0519             ;
+1788   0519             ENCODE:
+1789   0519             ; Encode HL register.  Each 4 bits of HL
+1790   0519             ; are encoded to 1 bit. 0000 become 0,
+1791   0519             ; 0001 become 1.  The result is stored
+1792   0519             ; in bit 3-0 of A register.  Also, after
+1793   0519             ; execution, bit 7-4 of A are bit 3-0
+1794   0519             ; before execution.
+1795   0519             ; Registers AF, B, HL are destroyed.
+1796   0519             
+1797   0519 06 04       	LD	B, 4		;Loop 4 times.
+1798   051B 29          ERL4	ADD	HL, HL		;Shift HL left 4 bits.
+1799   051C             				;Bit 12 of HL will be
+1800   051C             				;shifted into carry flag.
+1801   051C 29          	ADD	HL, HL
+1802   051D 29          	ADD	HL, HL
+1803   051E 29          	ADD	HL, HL
+1804   051F 17          	RLA			;Rotate carry flag into
+1805   0520             				;A register.
+1806   0520 10 F9       	DJNZ	ERL4
+1807   0522 C9          	RET
+1808   0523             ;
+1809   0523             ;***********************************************************
+1810   0523             SUM1:
+1811   0523             ; Calculate the sum of the data in a memory
+1812   0523             ; block.  The starting and ending address
+1813   0523             ; of this block are stored in STEPBF+2 - STEPBF+4
+1814   0523             ;   Registers AF, BC, DE, HL are destroyed.
+1815   0523             
+1816   0523 CD 30 05    	CALL	GETPTR		;Get parameters from
+1817   0526             				;step buffer.
+1818   0526 D8          	RET	C		;Return if the parameters
+1819   0527             				;are illegal.
+1820   0527             SUM:
+1821   0527             ; Calculate the sum of a memory block.
+1822   0527             ; HL contains the starting address of
+1823   0527             ; this block, BC contains the length.
+1824   0527             ; The result is stored in A.  Registers
+1825   0527             ; AF, BC, HL are destroyed.
+1826   0527             
+1827   0527 AF          	XOR	A		;Clear A
+1828   0528 86          SUMCAL	ADD	A, (HL)		;Add
+1829   0529 ED A1       	CPI
+1830   052B EA 28 05    	JP	PE, SUMCAL
+1831   052E B7          	OR	A		;Clear flags.
+1832   052F C9          	RET
+1833   0530             ;
+1834   0530             GETPTR:
+1835   0530             ; Get parameters from step buffer.
+1836   0530             ; Input:  (STEPBF+2) and (STEPBF+3) contain
+1837   0530             ;         starting address.
+1838   0530             ;         (STEPBF+4) and (STEPBF+5) contain
+1839   0530             ;         ending address.
+1840   0530             ; Output: HL register contains the starting
+1841   0530             ;         address.
+1842   0530             ;         BC register contains the length.
+1843   0530             ;         Carry flag 0 -- BC positive
+1844   0530             ;                    1 -- BC negative
+1845   0530             ; Destroyed registers: AF, BC, DE, HL.
+1846   0530             
+1847   0530 21 B1 1F    	LD	HL, STEPBF+2
+1848   0533 5E          GETP	LD	E, (HL)		;Load starting address
+1849   0534             				;into DE.
+1850   0534 23          	INC	HL
+1851   0535 56          	LD	D, (HL)
+1852   0536 23          	INC	HL
+1853   0537 4E          	LD	C, (HL)
+1854   0538 23          	INC	HL		;Load ending address
+1855   0539             				;into HL.
+1856   0539 66          	LD	H, (HL)
+1857   053A 69          	LD	L, C
+1858   053B B7          	OR	A		;Clear carry flag.
+1859   053C ED 52       	SBC	HL, DE		;Find difference.
+1860   053E             				;Carry flag is changed here.
+1861   053E 4D          	LD	C, L
+1862   053F 44          	LD	B, H
+1863   0540 03          	INC 	BC		;Now BC contains the
+1864   0541             				;length.
+1865   0541 EB          	EX	DE, HL		;Now HL contains the
+1866   0542             				;starting address.
+1867   0542 C9          	RET
+1868   0543             ;
+1869   0543             TAPEIN:
+1870   0543             ; Load a memory block from tape.
+1871   0543             ; Input: HL -- starting address of the block
+1872   0543             ;        BC -- length of the block
+1873   0543             ; Output: Carry flag 1 -- reading error
+1874   0543             ;                    0 -- no error
+1875   0543             ; Destroyed registers: AF, BC, DE, HL, AF', BC', DE', HL'
+1876   0543             
+1877   0543 AF          	XOR	A		;Clear carry flag.
+1878   0544             				;At beginning, the reading is
+1879   0544             				;no error.
+1880   0544 08          	EX	AF, AF'
+1881   0545 CD 50 05    TLOOP	CALL	GETBYTE		;Read 1 byte from tape.
+1882   0548 73          	LD	(HL), E		;Store it into memory.
+1883   0549 ED A1       	CPI
+1884   054B EA 45 05    	JP	PE, TLOOP	;Loop until length
+1885   054E             				;is zero.
+1886   054E 08          	EX	AF, AF'
+1887   054F C9          	RET
+1888   0550             ;
+1889   0550             GETBYTE:
+1890   0550             ; Read one byte from tape.
+1891   0550             ; Output: E -- data read
+1892   0550             ;         Carry of F' 1 -- reading error
+1893   0550             ;                     0 -- no error
+1894   0550             ; Destroy registers: AF, DE, AF', BC', DE', HL',
+1895   0550             ;Byte format:
+1896   0550             
+1897   0550             ; start bit bit bit bit bit bit bit bit stop
+1898   0550             ;  bit   0   1   2   3   4   5   6   7   bit
+1899   0550             
+1900   0550 CD 61 05    	CALL	GETBIT		;Get start bit.
+1901   0553 16 08       	LD	D, 8		;Loop 8 times
+1902   0555 CD 61 05    BLOOP	CALL	GETBIT		;Get one data bit.
+1903   0558             				;Result in carry flag.
+1904   0558 CB 1B       	RR	E		;Rotate it into E.
+1905   055A 15          	DEC	D
+1906   055B 20 F8       	JR	NZ, BLOOP
+1907   055D CD 61 05    	CALL	GETBIT		;Get stop bit.
+1908   0560 C9          	RET
+1909   0561             ;
+1910   0561             ;
+1911   0561             GETBIT:
+1912   0561             ; Read one bit from tape.
+1913   0561             ; Output: Carry of F:  0 -- this bit is 0
+1914   0561             ;                      1 -- this bit is 1
+1915   0561             ;         Carry of F': 1 -- reading error
+1916   0561             ;                      0 -- no error
+1917   0561             ; Destroyed registers: AF, AF', BC', DE', HL'
+1918   0561             ; Bit format:
+1919   0561             
+1920   0561             ;   0 -- 2 kHz 8 cycles + 1kHz 2 cycles.
+1921   0561             ;   1 -- 2 kHz 4 cycles + 1kHz 4 cycles.
+1922   0561             
+1923   0561 D9          	EXX			;Save HL, BC, DE registers
+1924   0562             
+1925   0562             ; The tape-bit format of both 0 and 1 are
+1926   0562             ; the same form: a high freq part followed by a
+1927   0562             ; low freq part. The difference between 0 and 1
+1928   0562             ; is the number of high freq cycles and low freq
+1929   0562             ; cycles.  Thus, a high freq period may have
+1930   0562             ; two meanings:
+1931   0562             ;  i) It is used to count the number of high
+1932   0562             ;     freq cycles of the current tape-bit;
+1933   0562             ; ii) If a high freq period is detected
+1934   0562             ;     immediately after a low freq period, then
+1935   0562             ;     this period is the first cycle of next
+1936   0562             ;     tape-bit and is used as a terminator of the
+1937   0562             ;     last tape-bit.
+1938   0562             
+1939   0562             ; Bit 0 of H register is used to indicate the usage
+1940   0562             ; of a high freq period.  If this bit is zero, high
+1941   0562             ; freq period causes counter increment for the current
+1942   0562             ; tape-bit.  If the high freq part has passed, bit 0
+1943   0562             ; of H is set and the next high freq period will be used
+1944   0562             ; as a terminator.
+1945   0562             ; L register is used to up/down count the number of periods.
+1946   0562             ; when a high freq period is read, L is increased by
+1947   0562             ; 1; when a low freq period is read, L is decreased
+1948   0562             ; by 2. (The time duration for each count is 0.5 ms.)
+1949   0562             ; At the end of a tape-bit, positive and negative L
+1950   0562             ; stand for 0 and 1 respectively.
+1951   0562             
+1952   0562 21 00 00    	LD	HL, 0		;Clear bit 0 of H,
+1953   0565             				;Set L to 0.
+1954   0565 CD 82 05    COUNT	CALL	PERIOD		;Read one period.
+1955   0568 14          	INC	D		;The next 2 instructions
+1956   0569             				;check if D is zero.  Carry
+1957   0569             				;flag is not affected.
+1958   0569 15          	DEC	D
+1959   056A 20 11       	JR	NZ, TERR	;If D is not zero, jump
+1960   056C             				;to error routine TERR.
+1961   056C             				;(Because the period is too
+1962   056C             				;much longer than that of 1 kHz.)
+1963   056C 38 06       	JR	C, SHORTP	;If the period is short
+1964   056E             				;(2 kHz), jump to SHORTP.
+1965   056E 2D          	DEC	L		;The period is 1 kHz,
+1966   056F             				;decrease L by 2.  And set
+1967   056F             				;bit 0 of H to indicate this
+1968   056F             				;tape-bit has passed high freq
+1969   056F             				;part and reaches its low freq part.
+1970   056F 2D          	DEC	L
+1971   0570 CB C4       	SET	0, H
+1972   0572 18 F1       	JR	COUNT
+1973   0574 2C          SHORTP	INC	L		;The period is 2 kHz,
+1974   0575             				;increase L by 1.
+1975   0575 CB 44       	BIT	0, H		;If the tape-bit has passed
+1976   0577             				;its high freq part, high frequency
+1977   0577             				;means this bit is all over and
+1978   0577             				;next bit has started.
+1979   0577 28 EC       	JR	Z, COUNT
+1980   0579             				;L = (# of 2kHz periods) - 2*(# of 1kHz periods)
+1981   0579 CB 15       	RL	L
+1982   057B             				; 0 --- NCarry (L positive)
+1983   057B             				; 1 ---  Carry (L negative)
+1984   057B             				;The positive or negative sign of
+1985   057B             				;L corresponds to the tape-bit data.
+1986   057B             				;'RL  L' will shift the sign bit of
+1987   057B             				;L into carry flag.  After this
+1988   057B             				;instruction, the carry flag
+1989   057B             				;contains the tape-bit.
+1990   057B D9          	EXX			;Restore BC', DE', HL'
+1991   057C C9          	RET
+1992   057D 08          TERR	EX	AF, AF'
+1993   057E 37          	SCF			;Set carry flag of F' to indicate error.
+1994   057F 08          	EX	AF, AF'
+1995   0580 D9          	EXX
+1996   0581 C9          	RET
+1997   0582             ;
+1998   0582             PERIOD:
+1999   0582             ; Wait the tape to pass one period.
+2000   0582             ; The time duration is stored in DE.  The
+2001   0582             ; unit is loop count.  Typical value for
+2002   0582             ; 2kHz is 28, for 1 kHz is 56.
+2003   0582             ; Use (56+28)/2 as threshold.  The returned
+2004   0582             ; result is in carry flag. (1 kHz -- NC, 2 kHz -- C)
+2005   0582             ; Registers destroyed: AF, DE
+2006   0582             
+2007   0582 11 00 00    	LD	DE, 0
+2008   0585 DB 00       LOOPH	IN	A, (KIN)	;Bit 7 of port A is Tapein.
+2009   0587 13          	INC	DE
+2010   0588 17          	RLA
+2011   0589 38 FA       	JR	C, LOOPH	;Loop until input goes low.
+2012   058B 3E FF       	LD	A, 11111111B	;Echo the tape input to
+2013   058D             				;speaker on MPF-I.
+2014   058D D3 01       	OUT	(DIGIT), A
+2015   058F DB 00       LOOPL	IN	A, (KIN)
+2016   0591 13          	INC	DE
+2017   0592 17          	RLA
+2018   0593 30 FA       	JR	NC, LOOPL	;Loop untili input goes high.
+2019   0595 3E 7F       	LD	A, 01111111B	;Echo the tape input to
+2020   0597             				;speaker on MPF-I.
+2021   0597 D3 01       	OUT	(DIGIT), A
+2022   0599 7B          	LD	A, E		;Compare the result with
+2023   059A             				;the threshold.
+2024   059A FE 2A       	CP	MPERIOD
+2025   059C C9          	RET
+2026   059D             ;
+2027   059D             ;***********************************************************
+2028   059D             TAPEOUT:
+2029   059D             ; Output a memory block to tape.
+2030   059D             ; Input: HL -- starting address of the block
+2031   059D             ;        BC -- length of the block
+2032   059D             ; Destroyed registers: AF, BC, DE, HL, BC', DE', HL'
+2033   059D             
+2034   059D 5E          	LD	E, (HL)		;Get the data.
+2035   059E CD A7 05    	CALL	OUTBYTE		;Output to tape.
+2036   05A1 ED A1       	CPI
+2037   05A3 EA 9D 05    	JP	PE, TAPEOUT	; Loop until finished.
+2038   05A6 C9          	RET
+2039   05A7             ;
+2040   05A7             OUTBYTE:
+2041   05A7             ; Output one byte to tape.  For tape-byte
+2042   05A7             ; format, see coments on GETBYTE.
+2043   05A7             ; Input: E -- data
+2044   05A7             ; Destroyed registers: AF, DE, BC', DE', HL'
+2045   05A7             
+2046   05A7 16 08       	LD	D, 8		;Loop 8 times
+2047   05A9 B7          	OR	A		;Clear carry flag.
+2048   05AA CD BA 05    	CALL	OUTBIT		;Output start bit.
+2049   05AD CB 1B       OLOOP	RR	E		;Rotate data into carry
+2050   05AF CD BA 05    	CALL	OUTBIT		;Output the carry
+2051   05B2 15          	DEC	D
+2052   05B3 20 F8       	JR	NZ, OLOOP
+2053   05B5 37          	SCF			;Set carry flag.
+2054   05B6 CD BA 05    	CALL	OUTBIT		;Output stop bit
+2055   05B9 C9          	RET
+2056   05BA             ;
+2057   05BA             OUTBIT:
+2058   05BA             ; Output one bit to tape.
+2059   05BA             ; Input: data in carry flag.
+2060   05BA             ; Destroyed registers: AF, BC', DE', HL'
+2061   05BA D9          	EXX			;Save BC, DE, HL.
+2062   05BB 26 00       	LD	H, 0
+2063   05BD 38 09       	JR	C, OUT1		;If data=1, output 1.
+2064   05BF             OUT0:				;2 kHZ 8 cycles, 1kHz 2 cycles.
+2065   05BF 2E 08       	LD	L, ZERO_2K
+2066   05C1 CD E2 05    	CALL	TONE2K
+2067   05C4 2E 02       	LD	L, ZERO_1K
+2068   05C6 18 07       	JR	BITEND
+2069   05C8             ;
+2070   05C8             OUT1:				;2 Khz 4 cycles, 1kHz 4 cycles.
+2071   05C8 2E 04       	LD	L, ONE_2K
+2072   05CA CD E2 05    	CALL	TONE2K
+2073   05CD 2E 04       	LD	L, ONE_1K
+2074   05CF CD DE 05    BITEND	CALL	TONE1K
+2075   05D2 D9          	EXX			;Restore registers.
+2076   05D3 C9          	RET
+2077   05D4             
+2078   05DE             	.ORG 05DEH
+2079   05DE             ;
+2080   05DE             ;***********************************************************
+2081   05DE             ;
+2082   05DE             ;        UTILITY SUBROUTINES
+2083   05DE             ;
+2084   05DE             ;***********************************************************
+2085   05DE             ;
+2086   05DE             ; Function: Generate square wave to the MIC & speaker
+2087   05DE             ;           on MPF--1
+2088   05DE             ; Input:    C -- period = 2*(44+13*C) clock states.
+2089   05DE             ;          HL -- number of periods.
+2090   05DE             ; Output:  none.
+2091   05DE             ; Destroyed registers: AF, B, DE, HL.
+2092   05DE             ; Call: none
+2093   05DE             
+2094   05DE             TONE1K:
+2095   05DE 0E 41       	LD	C, F1KHZ
+2096   05E0 18 02       	JR	TONE
+2097   05E2             TONE2K:
+2098   05E2 0E 1F       	LD	C, F2KHZ
+2099   05E4             TONE:				;Half period: 44+13*C states
+2100   05E4 29          	ADD	HL, HL		;Double for half-cycle count
+2101   05E5 11 01 00    	LD	DE, 1
+2102   05E8 3E FF       	LD	A, 0FFH
+2103   05EA D3 01       SQWAVE	OUT	(DIGIT), A	;Bit-7 tapeout
+2104   05EC 41          	LD	B, C
+2105   05ED 10 FE       	DJNZ	$		;Half period delay
+2106   05EF EE 80       	XOR	80H		;Toggle output
+2107   05F1 ED 52       	SBC	HL, DE		;Decrement one count
+2108   05F3 20 F5       	JR	NZ, SQWAVE
+2109   05F5 C9          	RET
+2110   05F6             ;
+2111   05F6             ;***********************************************************
+2112   05F6             ; Function: check if a memory address is in RAM.
+2113   05F6             ; Input: HL -- address to be checked.
+2114   05F6             ; Output: Zero flag -- 0, ROM or nonexistant;
+2115   05F6             ;                      1, RAM.
+2116   05F6             ; Destroyed registers: AF
+2117   05F6             ; Call: none
+2118   05F6             
+2119   05F6             RAMCHK:
+2120   05F6 7E          	LD	A, (HL)
+2121   05F7 2F          	CPL
+2122   05F8 77          	LD	(HL), A
+2123   05F9 7E          	LD	A, (HL)
+2124   05FA 2F          	CPL
+2125   05FB 77          	LD	(HL), A
+2126   05FC BE          	CP	(HL)
+2127   05FD C9          	RET
+2128   05FE             ;
+2129   05FE             ;***********************************************************
+2130   05FE             ; Function: Scan the keyboard and display.  Loop until
+2131   05FE             ;           a key is detected.  If the key is already
+2132   05FE             ;           pressed when this routien starts execution,
+2133   05FE             ;           return when next key is entered.
+2134   05FE             ; Input:    IX points to the buffer containing the display patterns.
+2135   05FE             ;           6 LEDs require 6 byte data.  (IX) contains the
+2136   05FE             ;           pattern for rightmost LED, (IX+5) contains the
+2137   05FE             ;           pattern for leftmost LED.
+2138   05FE             ; Output:   A = internal code of the key pressed.
+2139   05FE             ; Destroyed registers: AF, B, HL, AF', BC', DE'.
+2140   05FE             ;                      All other registers except IY are also
+2141   05FE             ;                      changed during execution, but they are
+2142   05FE             ;                      restored before return.
+2143   05FE             ; Call: SCAN1
+2144   05FE             
+2145   05FE             SCAN:
+2146   05FE DD E5       	PUSH	IX		;Save IX.
+2147   0600 21 E6 1F    	LD	HL, TEST
+2148   0603 CB 7E       	BIT	7, (HL)		;This bit is set if the user
+2149   0605             				;has entered illegal key.  The
+2150   0605             				;display will be disables as
+2151   0605             				;a warning to the user.  This
+2152   0605             				;is done by replacing the display
+2153   0605             				;buffer pointer IX by BLANK.
+2154   0605 28 04       	JR	Z, SCPRE
+2155   0607 DD 21 A5 07 	LD	IX, BLANK
+2156   060B             
+2157   060B             ; Wait until all keys are released for 40 ms.
+2158   060B             ; (The execution time of SCAN1 is 10 ms,
+2159   060B             ; 40 = 10 * 4.)
+2160   060B             
+2161   060B 06 04       SCPRE	LD	B, 4
+2162   060D CD 24 06    SCNX	CALL	SCAN1
+2163   0610 30 F9       	JR	NC, SCPRE	;If any key is pressed re-load
+2164   0612             				;the debounce counter B by 4.
+2165   0612 10 F9       	DJNZ	SCNX
+2166   0614 CB BE       	RES	7, (HL)		;Clear error-flag.
+2167   0616 DD E1       	POP	IX		;Restore original IX.
+2168   0618             
+2169   0618             ; Loop until any key is pressed.
+2170   0618             
+2171   0618 CD 24 06    SCLOOP	CALL	SCAN1
+2172   061B 38 FB       	JR	C, SCLOOP
+2173   061D             
+2174   061D             ; Convert the key-position-code returned by SCAN1 to
+2175   061D             ; key-internal-code.  This is done by table-lookup.
+2176   061D             ; The table used is KEYTAB.
+2177   061D             
+2178   061D 21 7B 07    KEYMAP	LD	HL, KEYTAB
+2179   0620 85          	ADD	A, L
+2180   0621 6F          	LD	L, A
+2181   0622 7E          	LD	A, (HL)
+2182   0623 C9          	RET
+2183   0624             ;
+2184   0624             ;***********************************************************
+2185   0624             ; Function: Scan keyboard and display one cycle.
+2186   0624             ;           Total execution time is about 10 10 ms (exactly
+2187   0624             ;           9.95 ms, 17812 clock states @ 1.79 MHz).
+2188   0624             ; Input: Same as SCAN.
+2189   0624             ; Output:  i) no key during one scan
+2190   0624             ;                  Carry flag -- 1
+2191   0624             ;         ii) key pressed during one scan
+2192   0624             ;                  Carry flag -- 0,
+2193   0624             ;                  A -- position code of the key pressed.
+2194   0624             ;                  If more than one key is pressed, A
+2195   0624             ;                  contains the largest position-code.
+2196   0624             ;                  (This key is the last key scanned.)
+2197   0624             ; Destroyed registers: AF, AF', BC', DE'. (see comments on SCAN)
+2198   0624             ; CALL: none.
+2199   0624             
+2200   0624             SCAN1:
+2201   0624             ;In hardware, the display and keyboard are
+2202   0624             ;arranged as a 6 by 6 matrix.  Each column
+2203   0624             ;corresponds to one LED and six key buttons.
+2204   0624             ;In normal operation, at most one column is
+2205   0624             ;active.  The pattern of the active LED is the
+2206   0624             ;data output on port C of 8255 I.  The data input
+2207   0624             ;from bit 0-5 of port A are the status of key
+2208   0624             ;buttons in the active column.  All signals on
+2209   0624             ;I/O port are active low.
+2210   0624             
+2211   0624 37          	SCF			;Set carry flag.
+2212   0625 08          	EX	AF, AF'
+2213   0626 D9          	EXX
+2214   0627             
+2215   0627             ;Carry flag of F' is used to return the status of
+2216   0627             ;the keyboard.  If any key is pressed during one
+2217   0627             ;scan, the flag is reset; otherwise it is set.
+2218   0627             ;Initially, this flag is set.  A' register is used
+2219   0627             ;to store the position-code of the key pressed.
+2220   0627             ;In this routine, 36 key positions are checked one
+2221   0627             ;by one.  C register contains the code of the key
+2222   0627             ;being checked.  The value of C is 0 at the beginning
+2223   0627             ;and is increased by 1 after each check.  So the code
+2224   0627             ;ranges from 0 to 23H (total 36 positions).  On each
+2225   0627             ;check, if the input bit is 0 (key pressed), C register
+2226   0627             ;is copied into A'.  The carry flag of F' is set also.
+2227   0627             ;When some key is detected, the key positions after
+2228   0627             ;this key will still be checked.  So if more than
+2229   0627             ;one key are pressed during one scan, the code of the
+2230   0627             ;last one will be returned.
+2231   0627             
+2232   0627 0E 00       	LD	C, 0		;Initial position code
+2233   0629 1E 01       	LD	E, 00000001B	;Scan from rightmost digit
+2234   062B 26 06       	LD	H, 6
+2235   062D             				;to the active column.
+2236   062D 7B          KCOL	LD	A, E
+2237   062E 2F          	CPL
+2238   062F D3 01       	OUT	(DIGIT), A	;Activate one column.
+2239   0631 DD 7E 00    	LD	A, (IX)
+2240   0634 D3 02       	OUT	(SEG7), A
+2241   0636             	
+2242   0636 CD 00 08    	CALL ADJUST_DISPLAY
+2243   0639             
+2244   0639             ;	CP      30H
+2245   0639             ;	JR NZ,BRIGHTER
+2246   0639                  
+2247   0639             ;	LD      B,1
+2248   0639             ;	JR SKIP1
+2249   0639             
+2250   0639             ;BRIGHTER LD	B, 10h ;COLDEL
+2251   0639             	
+2252   0639             ;SKIP1
+2253   0639             ;	DJNZ	$		;Delay 1.5 ms per digit.
+2254   0639             
+2255   0639 AF          	XOR	A		;Deactivate all display segments
+2256   063A D3 02       	OUT	(SEG7), A
+2257   063C             	
+2258   063C 06 50       	LD B,50H	; compensate LED brightness control
+2259   063E 10 FE       	DJNZ $
+2260   0640             
+2261   0640             	;LD	A, E
+2262   0640             	;CPL
+2263   0640             	;OR	11000000B
+2264   0640             	;OUT	(DIGIT), A
+2265   0640             	
+2266   0640 06 06       	LD	B, 6		;Each column has 6 keys.
+2267   0642 DB 00       	IN	A, (KIN)	;Now, bit 0-5 of A contain
+2268   0644             				;the status of the 6 keys
+2269   0644             				;in the active column.
+2270   0644 57          	LD	D, A		;Store A into D.
+2271   0645 CB 1A       KROW	RR	D		;Rotate D 1 bit right, bit 0
+2272   0647             				;of D will be rotated into
+2273   0647             				;carry flag.
+2274   0647 38 02       	JR	C, NOKEY	;Skip next 2 instructions
+2275   0649             				;if the key is not pressed.
+2276   0649             				;The next 2 instructions
+2277   0649             				;store the current position-code
+2278   0649             				;into A' and reset carry flag
+2279   0649             				;of F' register.
+2280   0649 79          	LD	A, C		;Key-in, get key position.
+2281   064A 08          	EX	AF, AF'		;Save A & Carry in AF'.
+2282   064B 0C          NOKEY	INC	C		;Increase current key-code by 1.
+2283   064C 10 F7       	DJNZ	KROW		;Loop until 6 keys in the
+2284   064E             				;active columns are checked.
+2285   064E DD 23       	INC	IX
+2286   0650 7B          	LD	A, E
+2287   0651             	;AND	00111111B
+2288   0651 CB 07       	RLC	A
+2289   0653             	;OR	11000000B
+2290   0653 5F          	LD	E, A
+2291   0654 25          	DEC	H
+2292   0655 20 D6       	JR	NZ, KCOL
+2293   0657 11 FA FF    	LD	DE, -6
+2294   065A DD 19       	ADD	IX, DE		;Get original IX.
+2295   065C D9          	EXX
+2296   065D 08          	EX	AF, AF'
+2297   065E C9          	RET
+2298   065F             
+2299   065F             
+2300   0665             	.ORG 0665H
+2301   0665             ;
+2302   0665             ;***********************************************************
+2303   0665             ; Function: Convert the 2 byte data stored in DE to
+2304   0665             ;           7-segment display format.  The output is stored
+2305   0665             ;           in the address field of DISPBF (display buffer),
+2306   0665             ;           most significant digit in DISPBF+5.
+2307   0665             ;           This routine is usually used by monitor only.
+2308   0665             ; Destroyed registers: AF, HLK.
+2309   0665             ; Call: HEX7SG
+2310   0665             
+2311   0665             ADDRDP:
+2312   0665 21 B8 1F    	LD	HL, DISPBF+2
+2313   0668 7B          	LD	A, E
+2314   0669 CD 78 06    	CALL	HEX7SG
+2315   066C 7A          	LD	A, D
+2316   066D CD 78 06    	CALL	HEX7SG
+2317   0670 C9          	RET
+2318   0671             ;
+2319   0671             ;***********************************************************
+2320   0671             ; Function: Convert the data stored in A to 7-segment
+2321   0671             ;           display format.  1 byte is converted to 2
+2322   0671             ;           digits.  The result is stored in the data
+2323   0671             ;           field of display buffer (DISPBF).
+2324   0671             ;           This routine is usually used by monitor only.
+2325   0671             ; Destroyed registers: AF, HL.
+2326   0671             ; Call: HEX7SG
+2327   0671             
+2328   0671             DATADP:
+2329   0671 21 B6 1F    	LD	HL, DISPBF
+2330   0674 CD 78 06    	CALL	HEX7SG
+2331   0677 C9          	RET
+2332   0678             ;
+2333   0678             ;***********************************************************
+2334   0678             ; Function: Convert binary data to 7-segment display
+2335   0678             ;           format.
+2336   0678             ; Input: 1 byte in A register
+2337   0678             ;        HL points to the result buffer.
+2338   0678             ; Output: Pattern for 2 digits.  Low order digit in (HL),
+2339   0678             ;         high order digit in (HL+1).
+2340   0678             ;         HL becomes HL+2.
+2341   0678             ; Destroyed registers: AF, HL.
+2342   0678             ; Call: HEX7
+2343   0678             
+2344   0678             HEX7SG:
+2345   0678 F5          	PUSH	AF
+2346   0679 CD 89 06    	CALL	HEX7
+2347   067C 77          	LD	(HL), A
+2348   067D 23          	INC	HL
+2349   067E F1          	POP	AF
+2350   067F 0F          	RRCA
+2351   0680 0F          	RRCA
+2352   0681 0F          	RRCA
+2353   0682 0F          	RRCA
+2354   0683 CD 89 06    	CALL	HEX7
+2355   0686 77          	LD	(HL), A
+2356   0687 23          	INC	HL
+2357   0688 C9          	RET
+2358   0689             ;
+2359   0689             ;***********************************************************
+2360   0689             ; Function: Convert binary data to 7-segment display
+2361   0689             ;           format.
+2362   0689             ; Input:  A -- LSB 4 bits contains the binary data
+2363   0689             ; Output: A -- display pattern for 1 digit.
+2364   0689             ; Destroyed registers: AF
+2365   0689             ; Call: none
+2366   0689             
+2367   0689             HEX7:
+2368   0689 E5          	PUSH	HL
+2369   068A 21 F0 07    	LD	HL, SEGTAB
+2370   068D E6 0F       	AND	0FH
+2371   068F 85          	ADD	A, L
+2372   0690 6F          	LD	L, A
+2373   0691 7E          	LD	A, (HL)
+2374   0692 E1          	POP	HL
+2375   0693 C9          	RET
+2376   0694             ;
+2377   0694             ;
+2378   0694             ;***********************************************************
+2379   0694             ; Function: RAM 1800-1FFF self-check.
+2380   0694             ; Input: note
+2381   0694             ; Output: none
+2382   0694             ; Destroyed registers: AF, BC, HL
+2383   0694             ; Call: RAMCHK
+2384   0694             
+2385   0694             RAMTEST:
+2386   0694 21 00 18    	LD	HL, 1800H
+2387   0697 01 00 08    	LD	BC, 0800H
+2388   069A CD F6 05    RAMT	CALL	RAMCHK
+2389   069D 28 01       	JR	Z, TNEXT
+2390   069F 76          	HALT			;If error
+2391   06A0 ED A1       TNEXT	CPI
+2392   06A2 EA 9A 06    	JP	PE, RAMT
+2393   06A5 C7          	RST	00H		;Display 'uPF--1'.
+2394   06A6             ;
+2395   06A6             ;***********************************************************
+2396   06A6             ;Monitor ROM self-check.  Add the data of address
+2397   06A6             ;0000 - 0800.  If the sum equals to 0.  Reset the monitor
+2398   06A6             ;and display 'uPF--1'.  If the sum is not0, which
+2399   06A6             ;indicates error, HALT.
+2400   06A6             ;Input: none.
+2401   06A6             ;Output: none.
+2402   06A6             ;Destroyed registers: AF, BC, HL.
+2403   06A6             ;Call: SUM.
+2404   06A6             
+2405   06A6             ROMTEST:
+2406   06A6 21 00 00    	LD	HL, 0
+2407   06A9 01 00 08    	LD	BC, 0800H
+2408   06AC CD 27 05    	CALL	SUM
+2409   06AF 28 01       	JR	Z, SUMOK
+2410   06B1 76          	HALT			;If error.
+2411   06B2 C7          SUMOK	RST	00H		;Display 'uPF--1'.
+2412   06B3 32 E5 1F    INI3	LD	(POWERUP), A	;Load power-code into
+2413   06B6             				;(POWERUP).  The monitor
+2414   06B6             				;uses the location to decide
+2415   06B6             				;wether a reset signal is
+2416   06B6             				;on power-up.
+2417   06B6 3E 55       	LD	A, 55H
+2418   06B8 32 F0 1F    	LD	(BEEPSET), A
+2419   06BB 3E 44       	LD	A, 44H
+2420   06BD 32 F1 1F    	LD	(FBEEP), A	;Beep frequency when key is
+2421   06C0             				;pressed.
+2422   06C0 21 F2 1F    	LD	HL, TBEEP
+2423   06C3 36 2F       	LD	(HL), 2FH	;Time duration of beep when
+2424   06C5 23          	INC	HL
+2425   06C6 36 00       	LD	(HL), 0
+2426   06C8             				;key is pressed.
+2427   06C8 C3 CE 03    	JP	INI4
+2428   06CB             
+2429   06CB F5          BEEP	PUSH	AF
+2430   06CC 21 F1 1F    	LD	HL, FBEEP
+2431   06CF 4E          	LD	C, (HL)
+2432   06D0 2A F2 1F    	LD	HL, (TBEEP)
+2433   06D3 3A F0 1F    	LD	A, (BEEPSET)
+2434   06D6 FE 55       	CP	55H
+2435   06D8 20 03       	JR	NZ, NOTONE	;There is no beep sound when
+2436   06DA             				;the key is pressed if data
+2437   06DA             				;of (BEEPSET) is not 55H
+2438   06DA CD E4 05    	CALL	TONE
+2439   06DD             NOTONE:
+2440   06DD F1          	POP	AF
+2441   06DE C3 EB 00    	JP	KEYEXEC		;After a key is detected, determine
+2442   06E1             				;what action should the monitor take.
+2443   06E1             				;KEYEXEC uses the next 3 fators
+2444   06E1             				;to get the entry point of proper
+2445   06E1             				;service routine: key-code, STATE
+2446   06E1             				;and STMINOR (Minor-State).
+2447   06E1             ; Below are the branch tables for each key and
+2448   06E1             ; state.  The first entry of each table is
+2449   06E1             ; a base address, other entrys are the offset to
+2450   06E1             ; this address.  Offset is only one byte long,
+2451   06E1             ; which is much shorter than the 2-byte address.
+2452   06E1             ; This can save the monitor code space.
+2453   06E1             
+2454   0737             KSUBFUN	.ORG	0737H
+2455   0737 1D 01       	.WORD	KINC
+2456   0739 00          	.BYTE	-KINC+KINC
+2457   073A 05          	.BYTE	-KINC+KDEC
+2458   073B 0A          	.BYTE	-KINC+KGO
+2459   073C 0F          	.BYTE	-KINC+KSTEP
+2460   073D 1A          	.BYTE	-KINC+KDATA
+2461   073E 2C          	.BYTE	-KINC+KSBR
+2462   073F 42          	.BYTE	-KINC+KINS
+2463   0740 7B          	.BYTE	-KINC+KDEL
+2464   0741 C4 01       KFUN	.WORD	KPC
+2465   0743 00          	.BYTE	-KPC+KPC
+2466   0744 1C          	.BYTE	-KPC+KADDR
+2467   0745 0A          	.BYTE	-KPC+KCBR
+2468   0746 14          	.BYTE	-KPC+KREG
+2469   0747 20          	.BYTE	-KPC+KMV
+2470   0748 20          	.BYTE	-KPC+KRL
+2471   0749 26          	.BYTE	-KPC+KWT
+2472   074A 26          	.BYTE	-KPC+KRT
+2473   074B EE 01       HTAB	.WORD	HFIX
+2474   074D 00          	.BYTE	-HFIX+HFIX
+2475   074E 16          	.BYTE	-HFIX+HAD
+2476   074F 03          	.BYTE	-HFIX+HDA
+2477   0750 26          	.BYTE	-HFIX+HRGFIX
+2478   0751 34          	.BYTE	-HFIX+HMV
+2479   0752 34          	.BYTE	-HFIX+HRL
+2480   0753 34          	.BYTE	-HFIX+HWT
+2481   0754 34          	.BYTE	-HFIX+HRT
+2482   0755 26          	.BYTE	-HFIX+HRGAD
+2483   0756 44          	.BYTE	-HFIX+HRGDA
+2484   0757 3F 02       ITAB	.WORD	IFIX
+2485   0759 00          	.BYTE	-IFIX+IFIX
+2486   075A 03          	.BYTE	-IFIX+IAD
+2487   075B 03          	.BYTE	-IFIX+IDA
+2488   075C 00          	.BYTE	-IFIX+IRGFIX
+2489   075D 0E          	.BYTE	-IFIX+IMV
+2490   075E 0E          	.BYTE	-IFIX+IRL
+2491   075F 0E          	.BYTE	-IFIX+IWT
+2492   0760 0E          	.BYTE	-IFIX+IRT
+2493   0761 1F          	.BYTE	-IFIX+IRGAD
+2494   0762 1F          	.BYTE	-IFIX+IRGDA
+2495   0763 6D 02       DTAB	.WORD	DFIX
+2496   0765 00          	.BYTE	-DFIX+DFIX
+2497   0766 03          	.BYTE	-DFIX+DAD
+2498   0767 03          	.BYTE	-DFIX+DDA
+2499   0768 00          	.BYTE	-DFIX+DRGFIX
+2500   0769 0E          	.BYTE	-DFIX+DMV
+2501   076A 0E          	.BYTE	-DFIX+DRL
+2502   076B 0E          	.BYTE	-DFIX+DWT
+2503   076C 0E          	.BYTE	-DFIX+DRT
+2504   076D 1F          	.BYTE	-DFIX+DRGAD
+2505   076E 1F          	.BYTE	-DFIX+DRGDA
+2506   076F 9B 02       GTAB	.WORD	GFIX
+2507   0771 00          	.BYTE	-GFIX+GFIX
+2508   0772 03          	.BYTE	-GFIX+GAD
+2509   0773 03          	.BYTE	-GFIX+GDA
+2510   0774 00          	.BYTE	-GFIX+GRGFIX
+2511   0775 4B          	.BYTE	-GFIX+GMV
+2512   0776 6D          	.BYTE	-GFIX+GRL
+2513   0777 8B          	.BYTE	-GFIX+GWT
+2514   0778 B0          	.BYTE	-GFIX+GRT
+2515   0779 00          	.BYTE	-GFIX+GRGAD
+2516   077A 00          	.BYTE	-GFIX+GRGDA
+2517   077B             
+2518   077B             ; Key-posistion-code to key-internal-code conversion table.
+2519   077B             
+2520   077B             KEYTAB:
+2521   077B 03          K0	.BYTE	03H	;HEX_3
+2522   077C 07          K1	.BYTE	07H	;HEX_7
+2523   077D 0B          K2	.BYTE	0BH	;HEX_B
+2524   077E 0F          K3	.BYTE	0FH	;HEX_F
+2525   077F 20          K4	.BYTE	20H	;NOT USED
+2526   0780 21          K5	.BYTE	21H	;NOT USED
+2527   0781 02          K6	.BYTE	02H	;HEX_2
+2528   0782 06          K7	.BYTE	06H	;HEX_6
+2529   0783 0A          K8	.BYTE	0AH	;HEX_A
+2530   0784 0E          K9	.BYTE	0EH	;HEX_E
+2531   0785 22          K0A	.BYTE	22H	;NOT USED
+2532   0786 23          K0B	.BYTE	23H	;NOT USED
+2533   0787 01          K0C	.BYTE	01H	;HEX_1
+2534   0788 05          K0D	.BYTE	05H	;HEX_5
+2535   0789 09          K0E	.BYTE	09H	;HEX_9
+2536   078A 0D          K0F	.BYTE	0DH	;HEX_D
+2537   078B 13          K10	.BYTE	13H	;STEP
+2538   078C 1F          K11	.BYTE	1FH	;TAPERD
+2539   078D 00          K12	.BYTE	00H	;HEX_0
+2540   078E 04          K13	.BYTE	04H	;HEX_4
+2541   078F 08          K14	.BYTE	08H	;HEX_8
+2542   0790 0C          K15	.BYTE	0CH	;HEX_C
+2543   0791 12          K16	.BYTE	12H	;GO
+2544   0792 1E          K17	.BYTE	1EH	;TAPEWR
+2545   0793 1A          K18	.BYTE	1AH	;CBR
+2546   0794 18          K19	.BYTE	18H	;PC
+2547   0795 1B          K1A	.BYTE	1BH	;REG
+2548   0796 19          K1B	.BYTE	19H	;ADDR
+2549   0797 17          K1C	.BYTE	17H	;DEL
+2550   0798 1D          K1D	.BYTE	1DH	;RELA
+2551   0799 15          K1E	.BYTE	15H	;SBR
+2552   079A 11          K1F	.BYTE	11H	;-
+2553   079B 14          K20	.BYTE	14H	;DATA
+2554   079C 10          K21	.BYTE	10H	;+
+2555   079D 16          K22	.BYTE	16H	;INS
+2556   079E 1C          K23	.BYTE	1CH	;MOVE
+2557   079F             ;
+2558   079F             ;
+2559   079F             ;
+2560   079F             ;
+2561   079F BD          MPF_I	.BYTE	0bdh ;030H		;'1'
+2562   07A0 BF          	.BYTE	0bfh ;002H		;'-'
+2563   07A1 B5          	.BYTE	0b5h ;002H		;'-'
+2564   07A2 1F          	.BYTE	1fh ;00FH		;'F'
+2565   07A3 8D          	.BYTE	8dh  ;01FH		;'P'
+2566   07A4 00          	.BYTE	0h  ;0A1H		;'u'
+2567   07A5 00          BLANK	.BYTE	0
+2568   07A6 00          	.BYTE	0
+2569   07A7 00          	.BYTE	0
+2570   07A8 00          	.BYTE	0
+2571   07A9 00          ERR_	.BYTE	0
+2572   07AA 00          	.BYTE	0
+2573   07AB 03          	.BYTE	003H		;'R'
+2574   07AC 03          	.BYTE	003H		;'R'
+2575   07AD 8F          	.BYTE	08FH		;'E'
+2576   07AE 02          	.BYTE	002H		;'-'
+2577   07AF 1F          SYS_SP	.BYTE	01FH		;'P'
+2578   07B0 AE          	.BYTE	0AEH		;'S'
+2579   07B1 02          	.BYTE	002H		;'-'
+2580   07B2 AE          	.BYTE	0AEH		;'S'
+2581   07B3 B6          	.BYTE	0B6H		;'Y'
+2582   07B4 AE          	.BYTE	0AEH		;'S'
+2583   07B5 1F          ERR_SP	.BYTE	01FH		;'P'
+2584   07B6 AE          	.BYTE	0AEH		;'S'
+2585   07B7 02          	.BYTE	002H		;'-'
+2586   07B8 03          	.BYTE	003H		;'R'
+2587   07B9 03          	.BYTE	003H		;'R'
+2588   07BA 8F          	.BYTE	08FH		;'E'
+2589   07BB 00          	.BYTE	0
+2590   07BC AE          STEPTAB	.BYTE	0AEH		;'S'
+2591   07BD 8F          	.BYTE	08FH		;'E'
+2592   07BE B3          	.BYTE	0B3H		;'D'
+2593   07BF 00          	.BYTE	0
+2594   07C0 AE          	.BYTE	0AEH		;'S'
+2595   07C1 B3          	.BYTE	0B3H		;'D'
+2596   07C2 00          	.BYTE	0
+2597   07C3 00          	.BYTE	0
+2598   07C4 0F          	.BYTE	00FH		;'F'
+2599   07C5 AE          	.BYTE	0AEH		;'S'
+2600   07C6 8F          	.BYTE	08FH		;'E'
+2601   07C7 00          	.BYTE	0
+2602   07C8 0F          	.BYTE	00FH		;'F'
+2603   07C9 00          	.BYTE	0
+2604   07CA 00          REG_	.BYTE	0
+2605   07CB 00          	.BYTE	0
+2606   07CC 02          	.BYTE	002H		;'-'
+2607   07CD BE          	.BYTE	0BEH		;'G'
+2608   07CE 8F          	.BYTE	08FH		;'E'
+2609   07CF 03          	.BYTE	003H		;'R'
+2610   07D0 0F 3F       RGTAB	.WORD	03F0FH		;'AF'
+2611   07D2 8D A7       	.WORD	0A78DH		;'BC'
+2612   07D4 8F B3       	.WORD	0B38FH		;'DE'
+2613   07D6 85 37       	.WORD	03785H		;'HL'
+2614   07D8 4F 3F       	.WORD	03F4FH		;'AF.'
+2615   07DA CD A7       	.WORD	0A7CDH		;'BC.'
+2616   07DC CF B3       	.WORD	0B3CFH		;'DE.'
+2617   07DE C5 37       	.WORD	037C5H		;'HL.'
+2618   07E0 07 30       	.WORD	03007H		;'IX'
+2619   07E2 B6 30       	.WORD	030B6H		;'IY'
+2620   07E4 1F AE       	.WORD	0AE1FH		;'SP'
+2621   07E6 0F 30       	.WORD	0300FH		;'IF'
+2622   07E8 37 0F       	.WORD	00F37H		;'FH'
+2623   07EA 85 0F       	.WORD	00F85H		;'FL'
+2624   07EC 77 0F       	.WORD	00F77H		;'FH.'
+2625   07EE C5 0F       	.WORD	00FC5H		;'FL.'
+2626   07F0 BD          SEGTAB	.BYTE	0BDH		;'0'
+2627   07F1 30          	.BYTE	030H		;'1'
+2628   07F2 9B          	.BYTE	09BH		;'2'
+2629   07F3 BA          	.BYTE	0BAH		;'3'
+2630   07F4 36          	.BYTE	036H		;'4'
+2631   07F5 AE          	.BYTE	0AEH		;'5'
+2632   07F6 AF          	.BYTE	0AFH		;'6'
+2633   07F7 38          	.BYTE	038H		;'7'
+2634   07F8 BF          	.BYTE	0BFH		;'8'
+2635   07F9 BE          	.BYTE	0BEH		;'9'
+2636   07FA 3F          	.BYTE	03FH		;'A'
+2637   07FB A7          	.BYTE	0A7H		;'B'
+2638   07FC 8D          	.BYTE	08DH		;'C'
+2639   07FD B3          	.BYTE	0B3H		;'D'
+2640   07FE 8F          	.BYTE	08FH		;'E'
+2641   07FF 0F          	.BYTE	00FH		;'F'
+2642   0800             
+2643   0800             
+2644   0800             
+2645   0800             ;*******************************************************************************
+2646   0800             ;*******************************************************************************
+2647   0800             ;*******************************************************************************
+2648   0800             ;   add utilitiy subroutines
+2649   0800             	
+2650   0800             	
+2651   0800             	.ORG 800H
+2652   0800             
+2653   0800             
+2654   0800 C5          ADJUST_DISPLAY	PUSH BC
+2655   0801 0E 00       	        LD C,0
+2656   0803 06 08                       LD B,8
+2657   0805             
+2658   0805 CB 1F       CHK_ONE		RR A
+2659   0807 D2 0B 08    		JP NC, SKIP0
+2660   080A             
+2661   080A 0C          		INC C
+2662   080B 10 F8       SKIP0           DJNZ CHK_ONE
+2663   080D 79          		LD A,C
+2664   080E C1          		POP BC
+2665   080F             
+2666   080F FE 04       		CP 4
+2667   0811 D2 18 08    		JP NC,BRIGHTER
+2668   0814             
+2669   0814 06 01       		LD      B,1
+2670   0816 18 02       		JR SKIP1
+2671   0818             
+2672   0818 06 10       BRIGHTER	LD B,10h ;COLDEL
+2673   081A             	
+2674   081A             SKIP1
+2675   081A 10 FE       		DJNZ	$	
+2676   081C C9          		RET
+2677   081D             
+2678   081D             ; SEND ASCII LETTER TO TERMINAL
+2679   081D             ; ENTRY: A
+2680   081D             
+2681   081D 5F          SEND_BYTE: LD E,A
+2682   081E                          
+2683   081E 3E 7F                 LD A,7FH
+2684   0820 D3 01                 OUT (1),A
+2685   0822 CD 49 08              CALL BIT_DELAY   ; SEND START BIT
+2686   0825                      
+2687   0825 16 08                 LD D,8
+2688   0827                         
+2689   0827 CB 43       CHK_BIT:   BIT 0,E
+2690   0829 CA 32 08               JP Z,SEND_ZERO
+2691   082C                        
+2692   082C 3E FF                  LD A,0FFH
+2693   082E D3 01                  OUT (1),A
+2694   0830 18 06                 JR NEXT_BIT
+2695   0832                          
+2696   0832 3E 7F       SEND_ZERO: LD A,7FH
+2697   0834 D3 01                  OUT (1),A
+2698   0836 18 00                  JR NEXT_BIT
+2699   0838                         
+2700   0838 CD 49 08    NEXT_BIT:  CALL BIT_DELAY
+2701   083B                  
+2702   083B CB 0B                  RRC E
+2703   083D 15                     DEC D
+2704   083E C2 27 08              JP NZ,CHK_BIT
+2705   0841                         
+2706   0841 3E FF                 LD A,0FFH
+2707   0843 D3 01                 OUT (1),A
+2708   0845 CD 49 08              CALL BIT_DELAY  ; SEND STOP BIT
+2709   0848 C9                    RET
+2710   0849                        
+2711   0849             ; BIT PERIOD FOR 2400 BIT/S
+2712   0849                         
+2713   0849 06 31       BIT_DELAY: LD B,31H      ; old value 12H for 330pF
+2714   084B 00                     NOP           ; new value 31H for 100pF 1198Hz (1200Hz)
+2715   084C 00                     NOP
+2716   084D 00                     NOP
+2717   084E 00          	   NOP
+2718   084F 10 FE                  DJNZ $
+2719   0851 C9                     RET
+2720   0852             
+2721   0852             ; PRINT STRING TO TERMINAL
+2722   0852             ; ENTRY: IX STRING POINTER
+2723   0852             
+2724   0852 DD 7E 00    PSTRING  LD A,(IX)
+2725   0855 FE 00       	 CP 0
+2726   0857 20 01       	 JR NZ,NEXT_LETTER
+2727   0859 C9          	 RET
+2728   085A             
+2729   085A CD 1D 08    NEXT_LETTER CALL SEND_BYTE
+2730   085D DD 23       	    INC IX
+2731   085F 18 F1       	    JR PSTRING
+2732   0861             
+2733   0861 CD 1D 08    COUT        CALL SEND_BYTE
+2734   0864 C9          	    RET
+2735   0865             
+2736   0865             ; WRITE NIBBLE TO TERMINAL
+2737   0865 F5          OUT1X       PUSH AF 
+2738   0866 E6 0F                    AND 0FH ;      ani  0fh 
+2739   0868 C6 30                    ADD A,30H  ;    adi  "0" 
+2740   086A FE 3A                    CP  3AH
+2741   086C 38 02       	     JR C,OUT1X1
+2742   086E C6 07       	     ADD A,7
+2743   0870 CD 61 08    OUT1X1	     CALL COUT
+2744   0873 F1          	     POP AF
+2745   0874 C9          	     RET
+2746   0875             
+2747   0875             
+2748   0875 CB 0F       OUT2X        RRC A
+2749   0877 CB 0F       	     RRC A
+2750   0879 CB 0F       	     RRC A
+2751   087B CB 0F       	     RRC A
+2752   087D CD 65 08    	     CALL OUT1X
+2753   0880 CB 0F       	     RRC A
+2754   0882 CB 0F       	     RRC A
+2755   0884 CB 0F       	     RRC A
+2756   0886 CB 0F       	     RRC A
+2757   0888 CD 65 08    	     CALL OUT1X
+2758   088B C9          	     RET
+2759   088C             
+2760   088C             
+2761   088C 3E 0D       NEW_LINE     LD A,0DH
+2762   088E CD 61 08    	     CALL COUT
+2763   0891 3E 0A       	     LD A,0AH
+2764   0893 CD 61 08    	     CALL COUT
+2765   0896 C9          	     RET
+2766   0897             
+2767   0897 3E 20       ONE_SPACE    LD A,20H
+2768   0899 CD 61 08                 CALL COUT
+2769   089C C9          	     RET
+2770   089D             
+2771   089D             ; DISPLAY 16 BYTES START AT CURRENT PC
+2772   089D             ; ENTRY: HL POINTED TO MEMORY ADDRESS TO BE DISPLAYED
+2773   089D             
+2774   089D CD 8C 08    HEX_DUMP    CALL NEW_LINE
+2775   08A0 7C                      LD A,H
+2776   08A1 CD 75 08    	    CALL OUT2X
+2777   08A4 7D          	    LD A,L
+2778   08A5 CD 75 08    	    CALL OUT2X
+2779   08A8 CD 97 08    	    CALL ONE_SPACE
+2780   08AB             	    
+2781   08AB 0E 10       	    LD C,16
+2782   08AD             
+2783   08AD CD 97 08    HEX_DUMP1   CALL ONE_SPACE
+2784   08B0 7E          	    LD A,(HL)
+2785   08B1 CD 75 08    	    CALL OUT2X
+2786   08B4 23          	    INC HL
+2787   08B5             
+2788   08B5 0D          	    DEC C
+2789   08B6 20 F5       	    JR NZ,HEX_DUMP1
+2790   08B8 C9          	    RET
+2791   08B9             
+2792   08B9             
+2793   08B9             ; RECEIVE BYTE FROM 2400 BIT/S TERMINAL
+2794   08B9             ; EXIT: A
+2795   08B9             
+2796   08B9 D5          CIN	  PUSH DE
+2797   08BA             
+2798   08BA DB 00       CIN1	  IN A,(0)	; CHECK START BIT
+2799   08BC CB 7F       	  BIT 7,A
+2800   08BE C2 BA 08    	  JP NZ, CIN1
+2801   08C1             
+2802   08C1 CD E6 08    	  CALL BIT1_5_DELAY
+2803   08C4             
+2804   08C4 16 07                  LD D,7
+2805   08C6 1E 00       	   LD E,0
+2806   08C8                         
+2807   08C8 DB 00       CHK_BIT_RX   IN A,(0)
+2808   08CA CB 7F                  BIT 7,A
+2809   08CC C2 D3 08               JP NZ,BIT_IS_ONE
+2810   08CF                        
+2811   08CF CB BB                  RES 7,E
+2812   08D1 18 04                  JR NEXT_BIT_RX
+2813   08D3                          
+2814   08D3 CB FB       BIT_IS_ONE SET 7,E
+2815   08D5                        
+2816   08D5 18 00                  JR NEXT_BIT_RX
+2817   08D7                         
+2818   08D7 CD 49 08    NEXT_BIT_RX  CALL BIT_DELAY
+2819   08DA                  
+2820   08DA CB 0B                  RRC E
+2821   08DC 15                     DEC D
+2822   08DD C2 C8 08              JP NZ,CHK_BIT_RX
+2823   08E0             
+2824   08E0 CD 49 08    	  CALL BIT_DELAY    ; CENTER OF STOP BIT
+2825   08E3                        
+2826   08E3 7B          	   LD A,E 
+2827   08E4             
+2828   08E4 D1          	   POP DE
+2829   08E5             
+2830   08E5 C9                     RET
+2831   08E6             
+2832   08E6             ; DELAY 1.5 BIT FOR 2400 BIT/S
+2833   08E6 06 4D       BIT1_5_DELAY: LD B,4DH      ; old value 20H with 330pF
+2834   08E8 00                     NOP              ; 4DH is for 100pF 805Hz (800Hz)
+2835   08E9 00                     NOP
+2836   08EA 00                     NOP
+2837   08EB 00          	   NOP
+2838   08EC 10 FE                  DJNZ $
+2839   08EE C9                     RET 	
+2840   08EF             
+2841   08EF             ; CONVERT ASCII TO HEX
+2842   08EF             ; ENTRY: A
+2843   08EF             
+2844   08EF D6 30       TO_HEX     SUB 30H
+2845   08F1 FE 10       	   CP 10H
+2846   08F3 38 04       	   JR C,ZERO_NINE
+2847   08F5 E6 DF       	   AND 11011111B
+2848   08F7 D6 07       	   SUB 7
+2849   08F9             
+2850   08F9 C9          ZERO_NINE RET
+2851   08FA             
+2852   08FA             ; CONVERT TWO ASCII LETTERS  TO SINGLE BYTE
+2853   08FA             ; EXIT: A
+2854   08FA             
+2855   08FA C5          GET_HEX    PUSH BC
+2856   08FB                        
+2857   08FB CD B9 08    	   CALL CIN
+2858   08FE CD EF 08               CALL TO_HEX
+2859   0901 CB 0F       	   RRC A
+2860   0903 CB 0F       	   RRC A
+2861   0905 CB 0F       	   RRC A
+2862   0907 CB 0F       	   RRC A
+2863   0909 5F          	   LD E,A
+2864   090A CD B9 08    	   CALL CIN
+2865   090D CD EF 08    	   CALL TO_HEX
+2866   0910 83          	   ADD A,E
+2867   0911             
+2868   0911 C1          	   POP BC
+2869   0912 C9          	   RET
+2870   0913             
+2871   0913             
+2872   0913             ; UPLOAD HEX FILE
+2873   0913             ; EXECUTE AFTER KEY TAPE WRITE + GO 
+2874   0913             ;
+2875   0913             
+2876   0913 CD 30 05    UPLOAD_HEX CALL GETPTR
+2877   0916                     
+2878   0916             	; HL START ADDRESS
+2879   0916             	; BC LENGHT IN BYTE
+2880   0916             
+2881   0916 C5          	PUSH BC
+2882   0917 FD E3       	EX (SP),IY
+2883   0919 C1          	POP BC
+2884   091A             
+2885   091A AF          	XOR A
+2886   091B 32 F5 1F    	LD (ENDFLAG),A   ; CLEAR END FLAG
+2887   091E             	
+2888   091E             	
+2889   091E AF          UPLOAD1 XOR A
+2890   091F 32 F4 1F    	LD (BCC),A
+2891   0922             	
+2892   0922 CD 8C 08    	CALL NEW_LINE
+2893   0925             	
+2894   0925 3E 3A       UPLOAD2	LD A,':'
+2895   0927 CD 61 08    	CALL COUT
+2896   092A 3E 10       	LD A,10H
+2897   092C             
+2898   092C CD 93 09    	CALL ADD_BCC
+2899   092F             
+2900   092F CD 75 08    	CALL OUT2X
+2901   0932 7C          	LD A,H
+2902   0933             
+2903   0933 CD 93 09    	CALL ADD_BCC
+2904   0936             
+2905   0936 CD 75 08    	CALL OUT2X
+2906   0939 7D          	LD A,L
+2907   093A             	
+2908   093A CD 93 09    	CALL ADD_BCC
+2909   093D CD 75 08    	CALL OUT2X
+2910   0940             
+2911   0940 3E 00       	LD A,0
+2912   0942             	
+2913   0942 CD 75 08    	CALL OUT2X
+2914   0945             
+2915   0945 06 10       	LD B,16
+2916   0947             
+2917   0947 C5          UPLOAD3	PUSH BC
+2918   0948 7E          	LD A,(HL)
+2919   0949 CD 93 09    	CALL ADD_BCC
+2920   094C CD 75 08    	CALL OUT2X
+2921   094F 23          	INC HL
+2922   0950             
+2923   0950 06 32       	LD B,50		; DELAY BETWEEN CHARACTER
+2924   0952 10 FE       	DJNZ $
+2925   0954             
+2926   0954 C1          	POP BC
+2927   0955             
+2928   0955 FD 2B       	DEC IY
+2929   0957             
+2930   0957 FD 22 F6 1F 	LD (TEMP16),IY
+2931   095B             
+2932   095B ED 5B F6 1F 	LD DE,(TEMP16)
+2933   095F 7B          	LD A,E
+2934   0960 B2          	OR D
+2935   0961             
+2936   0961 20 05       	JR NZ, SKIP10
+2937   0963             	
+2938   0963 3E 01       	LD A,1
+2939   0965 32 F5 1F    	LD (ENDFLAG),A
+2940   0968             
+2941   0968             SKIP10
+2942   0968             
+2943   0968             
+2944   0968 10 DD       	DJNZ UPLOAD3
+2945   096A             
+2946   096A 3A F4 1F    	LD A,(BCC)
+2947   096D ED 44       	NEG 
+2948   096F             
+2949   096F CD 75 08    	CALL OUT2X   ; SEND BYTE CHECK SUM
+2950   0972             
+2951   0972             	
+2952   0972 3A F5 1F    	LD A,(ENDFLAG)
+2953   0975 CB 47       	BIT 0,A
+2954   0977 28 A5       	JR Z, UPLOAD1
+2955   0979             
+2956   0979             ; SEND END OF FILE RECORD
+2957   0979             	
+2958   0979 CD 8C 08    	CALL NEW_LINE
+2959   097C DD 21 87 09 	LD IX,END_OF_FILE
+2960   0980 CD 52 08    	CALL PSTRING
+2961   0983 CD 8C 08    	CALL NEW_LINE
+2962   0986             
+2963   0986 C9          	RET
+2964   0987             
+2965   0987 3A3030303030END_OF_FILE .BYTE ":00000001FF",0
+2965   098D 303031464600
+2966   0993             
+2967   0993             ; COMPUTE BYTE CHECK SUM
+2968   0993             
+2969   0993 F5          ADD_BCC PUSH AF
+2970   0994             	
+2971   0994             
+2972   0994 DD 21 F4 1F 	LD IX,BCC
+2973   0998 DD 86 00    	ADD A,(IX)
+2974   099B DD 77 00    	LD (IX),A
+2975   099E             
+2976   099E             	
+2977   099E F1          	POP AF
+2978   099F C9          	RET
+2979   09A0             
+2980   09A0             
+2981   09A0             ; GET_RECORD READS INTEL HEX FILE AND SAVE TO MEMORY
+2982   09A0             
+2983   09A0 AF          GET_RECORD XOR A
+2984   09A1 32 F8 1F    	   LD (_ERROR),A
+2985   09A4             
+2986   09A4 CD B9 08    GET_RECORD1 CALL CIN
+2987   09A7 FE 3A       	   CP ':'
+2988   09A9 20 F9       	   JR NZ,GET_RECORD1
+2989   09AB             	   
+2990   09AB AF          	   XOR A	; CLEAR BYTE CHECK SUM	
+2991   09AC 32 F4 1F    	   LD (BCC),A
+2992   09AF             	 
+2993   09AF CD FA 08    	   CALL GET_HEX
+2994   09B2 4F          	   LD C,A	; GET NUMBER OF BYTE
+2995   09B3             	   
+2996   09B3 CD 93 09    	   CALL ADD_BCC
+2997   09B6             	   
+2998   09B6             
+2999   09B6 CD FA 08    	   CALL GET_HEX
+3000   09B9 67          	   LD H,A
+3001   09BA             
+3002   09BA CD 93 09    	   CALL ADD_BCC
+3003   09BD             
+3004   09BD CD FA 08    	   CALL GET_HEX
+3005   09C0 6F          	   LD L,A        ; GET LOAD ADDRESS
+3006   09C1             
+3007   09C1 CD 93 09    	   CALL ADD_BCC
+3008   09C4             
+3009   09C4 CD FA 08    	   CALL GET_HEX
+3010   09C7             
+3011   09C7 FE 00       	   CP 0
+3012   09C9             
+3013   09C9 28 14       	   JR Z,DATA_RECORD
+3014   09CB             	   
+3015   09CB CD B9 08    WAIT_CR	   CALL CIN
+3016   09CE FE 0D       	   CP 0DH
+3017   09D0 20 F9       	   JR NZ,WAIT_CR
+3018   09D2             	   
+3019   09D2 D3 40       	   OUT (GPIO1),A
+3020   09D4             
+3021   09D4 3A F8 1F    	   LD A,(_ERROR)
+3022   09D7 FE 01       	   CP 1
+3023   09D9 20 03       	   JR NZ,NOERROR
+3024   09DB             
+3025   09DB C3 44 03    	   JP ERROR
+3026   09DE             
+3027   09DE C9          NOERROR    RET
+3028   09DF             
+3029   09DF             DATA_RECORD
+3030   09DF             
+3031   09DF CD FA 08    	   CALL GET_HEX
+3032   09E2 77          	   LD (HL),A	; WRITE TO MEMORY
+3033   09E3             	   
+3034   09E3 CD 93 09    	   CALL ADD_BCC
+3035   09E6             
+3036   09E6 D3 40       	   OUT (GPIO1),A
+3037   09E8             	   
+3038   09E8 23          	   INC HL
+3039   09E9 0D          	   DEC C
+3040   09EA 20 F3       	   JR NZ,DATA_RECORD ; UNTIL C=0
+3041   09EC             
+3042   09EC 3A F4 1F    	   LD A,(BCC)
+3043   09EF ED 44       	   NEG
+3044   09F1 32 F4 1F    	   LD (BCC),A
+3045   09F4 CD FA 08    	   CALL GET_HEX	   ; GET BYTE CHECK SUM
+3046   09F7             	   
+3047   09F7 5F          	   LD E,A
+3048   09F8             
+3049   09F8 3A F4 1F    	   LD A,(BCC)
+3050   09FB             
+3051   09FB BB          	   CP E		; COMPARE WITH BYTE CHECK SUM
+3052   09FC             	
+3053   09FC 28 05       	   JR Z,SKIP11
+3054   09FE             	   
+3055   09FE 3E 01       	   LD A,1
+3056   0A00 32 F8 1F    	   LD (_ERROR),A
+3057   0A03             
+3058   0A03             SKIP11
+3059   0A03             	   
+3060   0A03 18 9F       	   JR GET_RECORD1     ; NEXT LINE 
+3061   0A05             
+3062   0A05             
+3063   0A05             
+3064   0A05             
+3065   0A05             
+3066   0A05             
+3067   0A05             ;
+3068   0A05             ;***********************************************************
+3069   0A05             ;SYSTEM RAM AREA:
+3070   1F9F             USERSTK	.ORG	1F9FH
+3071   1F9F             	.BLOCK	16
+3072   1FAF             SYSSTK:	.ORG	1FAFH
+3073   1FAF             STEPBF	.BLOCK	7
+3074   1FB6             DISPBF	.BLOCK	6
+3075   1FBC             REGBF:
+3076   1FBC             USERAF	.BLOCK	2
+3077   1FBE             USERBC	.BLOCK	2
+3078   1FC0             USERDE	.BLOCK	2
+3079   1FC2             USERHL	.BLOCK	2
+3080   1FC4             UAFP	.BLOCK	2
+3081   1FC6             UBCP	.BLOCK	2
+3082   1FC8             UDEP	.BLOCK	2
+3083   1FCA             UHLP	.BLOCK	2
+3084   1FCC             USERIX	.BLOCK	2
+3085   1FCE             USERIY	.BLOCK	2
+3086   1FD0             USERSP	.BLOCK	2
+3087   1FD2             USERIF	.BLOCK	2
+3088   1FD4             FLAGH	.BLOCK	2
+3089   1FD6             FLAGL	.BLOCK	2
+3090   1FD8             FLAGHP	.BLOCK	2
+3091   1FDA             FLAGLP	.BLOCK	2
+3092   1FDC             USERPC	.BLOCK	2
+3093   1FDE             ;
+3094   1FDE             ADSAVE	.BLOCK	2		;Contains the address being
+3095   1FE0             				;displayed now.
+3096   1FE0             BRAD	.BLOCK	2		;Break point address
+3097   1FE2             BRDA	.BLOCK	1		;Data of break point address
+3098   1FE3             STMINOR	.BLOCK	1		;Minor state
+3099   1FE4             STATE	.BLOCK	1		;State
+3100   1FE5             POWERUP	.BLOCK	1		;Power-up initialization
+3101   1FE6             TEST	.BLOCK	1		;Flag, bit 0 -- set when function
+3102   1FE7             				;      or subfunction key is hit.
+3103   1FE7             				;      bit 7 -- set when illegal key
+3104   1FE7             				;            is entered.
+3105   1FE7             ATEMP	.BLOCK	1		;Temporary storage
+3106   1FE8             HLTEMP	.BLOCK	2		;Temporary storage
+3107   1FEA             TEMP	.BLOCK	4		;See comments on routine GDA.
+3108   1FEE             IM1AD	.BLOCK	2		;Contains the address of Opcode 'FF'
+3109   1FF0             				;service routine. (RST 38H, mode
+3110   1FF0             				;1 interrupt, etc.)
+3111   1FF0             BEEPSET	.BLOCK	1		;Default value is 55H
+3112   1FF1             FBEEP	.BLOCK	1		;Beep frequency
+3113   1FF2             TBEEP	.BLOCK	2		;Time duration of beep
+3114   1FF4             BCC	 .BLOCK 1
+3115   1FF5             ENDFLAG  .BLOCK 1
+3116   1FF6             TEMP16   .BLOCK 2
+3117   1FF8             _ERROR    .BLOCK 1
+3118   1FF9             	
+3119   1FF9             	.END
+tasm: Number of errors = 0

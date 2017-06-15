@@ -190,6 +190,7 @@ public class InstructionSet {
 
 		branch = new OpCodeNode[] { new OpCodeNode(Z80.patLIT_A, Z80.BAD_OPCODE),
 				 new OpCodeNode(Z80.patIND_XYd, "ADD_1"),
+				 new OpCodeNode(Z80.patIND_XY, "ADD_1A"),
 				 new OpCodeNode(Z80.patR8M, "ADD_2"),
 				 new OpCodeNode(Z80.patEXP, "ADD_3") };
 		root.addBranch(branch);

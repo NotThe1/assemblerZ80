@@ -42,6 +42,7 @@ import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
 import javax.swing.JScrollBar;
@@ -97,7 +98,7 @@ public class ASM  {//implements Observer
 		}
 		clearDoc(docSource);
 		clearDoc(docListing);
-
+		appLogger.resetCounts();
 		loadSourceFile(asmSourceFile, 1, null);
 		allLineParts = new LinkedList<SourceLineParts>();
 
@@ -111,7 +112,11 @@ public class ASM  {//implements Observer
 			saveMemoryFile(memoryImage);
 		} // if memory Image
 		mnuFilePrintListing.setEnabled(true);
+		if ( appLogger.getErrorCount() + appLogger.getWarningCount() !=0){
+			String msg = String.format("There are %d Errors%n and %d Warnings%n", appLogger.getErrorCount(), appLogger.getWarningCount());
+			JOptionPane.showMessageDialog(null, msg);
 
+		}
 	}// start
 
 	private void saveListing() {
@@ -758,7 +763,7 @@ public class ASM  {//implements Observer
 					char[] allCharacters = args.toCharArray();
 					for (char aCharacter : allCharacters) {
 						aByte = (byte) aCharacter;
-						sb.append(String.format("%02X", aByte));
+						sb.append(String.format("%02X ", aByte));
 						locationCount++;
 					} // for each
 				} else {
@@ -1375,6 +1380,7 @@ public class ASM  {//implements Observer
 
 		docListing = tpListing.getStyledDocument();
 		appLogger.setDoc(docListing);
+		appLogger.resetCounts();
 		sbarListing = spListing.getVerticalScrollBar();
 		sbarListing.setName(SBAR_LISTING);
 		sbarListing.addAdjustmentListener(adapterForASM);

@@ -176,7 +176,8 @@ public class SubInstructionSet {
 		subInstructions.put("ADC_4", new SubInstruction("ADC_4", Z80.LIT_HL, Z80.R16_SP, baseCodes));
 		// ADD
 		baseCodes = new byte[] { (byte) 0XDD, (byte) 0X86, (byte) 0X00 };
-		subInstructions.put("ADD_1", new SubInstruction("ADD_1", Z80.LIT_A, Z80.IND_XYd, baseCodes));
+		subInstructions.put("ADD_1", new SubInstruction("ADD_1", Z80.LIT_A, Z80.IND_XYd, baseCodes));//Z80.IND_XYd
+		subInstructions.put("ADD_1A", new SubInstruction("ADD_1A", Z80.LIT_A, Z80.IND_XY, baseCodes));//Z80.IND_XYd
 
 		baseCodes = new byte[] { (byte) 0X80 };
 		subInstructions.put("ADD_2", new SubInstruction("ADD_2", Z80.LIT_A, Z80.R_MAIN, baseCodes));

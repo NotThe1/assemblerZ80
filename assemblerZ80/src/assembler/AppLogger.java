@@ -9,8 +9,15 @@ import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
 
 public class AppLogger {
-	private StyledDocument docLog; // keep from failing if not set by using app
-
+	private StyledDocument docLog; // keep from failing if not set by parent
+	
+	private int countError;
+	private int countWarning;
+	private int countInfo;
+	private int countSpecial;
+	
+	
+	
 	private static AppLogger instance = new AppLogger();
 
 	public static AppLogger getInstance() {
@@ -25,8 +32,32 @@ public class AppLogger {
 		this.docLog = docLog;
 	}// setTextPane
 	// ---------------------------------------------------------------------
+	
+	public void resetCounts(){
+		countError = 0;
+		countWarning = 0;
+		countInfo = 0;
+		countSpecial = 0;
+	}//resetCounts
+	
+	public int getErrorCount(){
+		return countError;
+	}//
+
+	public int getWarningCount(){
+		return countWarning;
+	}//getWarningCount
+
+	public int getInfoCount(){
+		return countInfo;
+	}//getInfoCount
+
+	public int getSpecialCount(){
+		return countSpecial;
+	}//getSpecialCount
 
 	public void clear() {
+		 resetCounts();
 		try {
 			docLog.remove(0, docLog.getLength());
 		} catch (BadLocationException e) {
@@ -58,18 +89,22 @@ public class AppLogger {
 	}//addMeta
 	
 	public void addInfo(String... message){
+		countInfo++;
 		addMeta(attrBlack,message);
 	}//addInfo
 
 	public void addWarning(String... message){
+		countWarning++;
 		addMeta(attrBlue,message);
 	}//addInfo
 
 	public void addError(String... message){
+		countError++;
 		addMeta(attrRed,message);
 	}//addInfo
 
 	public void addSpecial(String... message){
+		countSpecial++;
 		addMeta(attrTeal,message);
 	}//addInfo
 	

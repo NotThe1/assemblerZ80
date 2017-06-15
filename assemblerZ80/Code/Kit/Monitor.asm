@@ -825,13 +825,15 @@ KRT:
 ; keys corresponding to each STATE.  They
 ; are all branched by table HTAB and STATE.
 
-HFIX	JP	IGNORE		;When the display is fixed pattern
+HFIX:
+	JP	IGNORE		;When the display is fixed pattern
 				;hexadecimal keys are illegal.
 				;Disable all LED's as a warning
 				;message to the user.  This is what
 				;routine IGNORE does.
 ;
-HDA	LD	HL, (ADSAVE)	;Get the address being displayed
+HDA:
+	LD	HL, (ADSAVE)	;Get the address being displayed
 				;now from (ADSAVE)
 	CALL	RAMCHK		;Check if it is in RAM.
 	JP	NZ, IGNORE	;If not, ignore this key and
@@ -897,7 +899,8 @@ HMV:	CALL	LOCSTBF		;Use STMINOR and STEPBF
 	CALL	STEPDP		;Display the parameter.
 	RET
 ;
-HRGDA	CALL	LOCRGBF		;Calculate the address of
+HRGDA:
+	CALL	LOCRGBF		;Calculate the address of
 				;the register being modified.
 	CALL	PRECL1		;If this is the first hex
 				;key entered.  Clear the register
@@ -2280,7 +2283,7 @@ KCOL:
 	LD	A, E
 	CPL
 	OUT	(DIGIT), A	;Activate one column.
-	LD	A, (IX)
+	LD	A, (IX + 0)
 	OUT	(SEG7), A
 	
 	CALL ADJUST_DISPLAY
@@ -2789,7 +2792,7 @@ BIT_DELAY: LD B,31H      ; old value 12H for 330pF
 ; ENTRY: IX STRING POINTER
 
 PSTRING:
-  LD A,(IX)
+  LD A,(IX + 0)
 	 CP 0
 	 JR NZ,NEXT_LETTER
 	 RET
@@ -3062,8 +3065,8 @@ ADD_BCC:
 	
 
 	LD IX,BCC
-	ADD A,(IX)
-	LD (IX),A
+	ADD A,(IX + 0)
+	LD (IX+0),A
 
 	
 	POP AF

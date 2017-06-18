@@ -768,7 +768,7 @@ public class ASM  {//implements Observer
 					} // for each
 				} else {
 					ansInt = resolveSimpleArgument(args, sourceLineParts.getLineNumber()) & 0XFF;
-					sb.append(String.format("%02X", ansInt));
+					sb.append(String.format("%02X ", ansInt));
 					locationCount++;
 				} // if
 			} // while

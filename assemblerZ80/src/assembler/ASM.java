@@ -66,7 +66,7 @@ import parser.Token;
 import parser.TokenType;
 import parser.Tokenizer;
 
-public class ASM  {//implements Observer
+public class ASM {// implements Observer
 
 	private AdapterForASM adapterForASM = new AdapterForASM();
 	private InstructionCounter instructionCounter = InstructionCounter.getInstance();
@@ -112,8 +112,9 @@ public class ASM  {//implements Observer
 			saveMemoryFile(memoryImage);
 		} // if memory Image
 		mnuFilePrintListing.setEnabled(true);
-		if ( appLogger.getErrorCount() + appLogger.getWarningCount() !=0){
-			String msg = String.format("There are %d Errors%n and %d Warnings%n", appLogger.getErrorCount(), appLogger.getWarningCount());
+		if (appLogger.getErrorCount() + appLogger.getWarningCount() != 0) {
+			String msg = String.format("There are %d Errors%n and %d Warnings%n", appLogger.getErrorCount(),
+					appLogger.getWarningCount());
 			JOptionPane.showMessageDialog(null, msg);
 
 		}
@@ -140,13 +141,16 @@ public class ASM  {//implements Observer
 			e.printStackTrace();
 		} // try
 	}// saveListing
-	
+
 	private void saveMemoryFile(ByteBuffer memoryImage) {
 		int startAddress = instructionCounter.getLowestLocationSet() & 0XFFF0;
 		byte[] memImage = new byte[memoryImage.capacity() - startAddress];
 		memoryImage.position(startAddress);
 		memoryImage.get(memImage);
 
+		Pattern patternEmpty;
+		Matcher matcherEmpty;
+		String line = null;
 		FileWriter fwMemFile = null;
 		PrintWriter pwMemFile = null;
 		FileWriter fwHexFile = null;
@@ -159,12 +163,18 @@ public class ASM  {//implements Observer
 			Files.deleteIfExists(Paths.get(hexFile));
 
 			if (rbMemFile.isSelected()) {
+				patternEmpty = Pattern.compile(": 00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00");
 				fwMemFile = new FileWriter(new File(memFile));
 				pwMemFile = new PrintWriter(fwMemFile);
-
 				MemFormatter memFormatter = MemFormatter.memFormatterFactory(startAddress, memImage);
 				while (memFormatter.hasNext()) {
-					pwMemFile.print((memFormatter.getNext()));
+					line = memFormatter.getNext();
+
+					matcherEmpty = patternEmpty.matcher(line);
+					if (matcherEmpty.find() & rbTerse.isSelected()) {
+						continue;
+					} // if
+					pwMemFile.print(line);
 				} // while Mem File
 				pwMemFile.close();
 				fwMemFile.close();
@@ -173,10 +183,24 @@ public class ASM  {//implements Observer
 			if (rbHexFile.isSelected()) {
 				fwHexFile = new FileWriter(new File(hexFile));
 				pwHexFile = new PrintWriter(fwHexFile);
-
+				String hexNumber;
+				Integer dataCount;
 				HexFormatter hexFormatter = new HexFormatter(startAddress, memImage);
 				while (hexFormatter.hasNext()) {
-					pwHexFile.println(hexFormatter.getNext());
+					line = hexFormatter.getNext();
+					if (!rbTerse.isSelected()) {
+						pwHexFile.println(line);
+					} else {
+						hexNumber = line.substring(1, 3);
+						dataCount = Integer.valueOf(hexNumber, 16);
+						dataCount = (dataCount * 2) +2; // add in data type
+						// patternEmpty = Pattern.compile("{i}:" + hexNumber + "[0-9A-F]{4}[0]{" + dataCount +"}");
+						patternEmpty = Pattern.compile(":" + hexNumber + "[0-9A-F]{4}[0]{" + dataCount + "}");
+						matcherEmpty = patternEmpty.matcher(line);
+						if (!matcherEmpty.find()) {
+							pwHexFile.println(line);
+						} // inner if
+					} // outer if
 				} // while Hex File
 				pwHexFile.println(hexFormatter.getEOF());
 				pwHexFile.close();
@@ -189,17 +213,16 @@ public class ASM  {//implements Observer
 
 	}// saveMemoryFile
 
-
 	/**
 	 * passTwo makes final pass at source, using symbol table to generate the object code
 	 */
 	private ByteBuffer passTwo() {
-//		int hiAddress = ((((instructionCounter.getCurrentLocation() - 1) / SIXTEEN) + 2) * SIXTEEN) - 1;
+		// int hiAddress = ((((instructionCounter.getCurrentLocation() - 1) / SIXTEEN) + 2) * SIXTEEN) - 1;
 		int hiAddress = (instructionCounter.getCurrentLocation() - 1) | 0X0F;
 		ByteBuffer memoryImage = ByteBuffer.allocate(hiAddress + 1);
 
 		instructionCounter.reset();
-//		clearDoc(docListing);
+		// clearDoc(docListing);
 		int currentLocation;
 		String instructionImage;
 		SourceLineParts sourceLineParts;
@@ -462,7 +485,7 @@ public class ASM  {//implements Observer
 				relExpression = argument2;
 			} // if
 				// Both JR_2 and JR_1
-			// value = resolveExpression(relExpression, sourceLineParts.getLineNumber());
+				// value = resolveExpression(relExpression, sourceLineParts.getLineNumber());
 			value = resolveRelativeValue(relExpression, sourceLineParts.getLineNumber());
 			ans[1] = (byte) (ans[1] | (byte) value);
 			break;
@@ -804,15 +827,14 @@ public class ASM  {//implements Observer
 	}// setMemoryBytesForDirective
 
 	private void buildMemoryImage(int pc, String lineImage, ByteBuffer memoryImage0) {
-		
+
 		int intValue;
 		String[] parts = lineImage.trim().split("\\s");
-		for (int i = 0; i < parts.length;i++){
+		for (int i = 0; i < parts.length; i++) {
 			intValue = Integer.valueOf(parts[i], 16);
 			memoryImage0.put((Integer) pc + i, (byte) intValue);
-		}//for
-		
-		
+		} // for
+
 	}// saveMemoryImage
 
 	private void makeXrefListing() {
@@ -878,7 +900,7 @@ public class ASM  {//implements Observer
 		if (sourceLineParts.isLineAllComment()) {
 			insertListing(sourceLineParts.getComment(), attrGreen);
 		} else {
-			insertListing(String.format("%4s",EMPTY_STRING),null);
+			insertListing(String.format("%4s", EMPTY_STRING), null);
 			insertListing(symbol, attributeSet1);
 			insertListing(cmd, attributeSet);
 			String argument = String.format("%-20s ", sourceLineParts.getArgumentField());
@@ -893,7 +915,7 @@ public class ASM  {//implements Observer
 	 * passOne sets up the symbol table with initial value for Labels & symbols
 	 */
 	private void passOne() {
-//		clearDoc(docListing);
+		// clearDoc(docListing);
 
 		int lineNumber;
 		String sourceLine;
@@ -912,7 +934,6 @@ public class ASM  {//implements Observer
 			if (!sourceLineParts.isLineActive()) {
 				continue;
 			} // if skip textbox's empty lines
-			
 
 			lineNumber = sourceLineParts.getLineNumber();
 			allLineParts.add(sourceLineParts);
@@ -956,7 +977,8 @@ public class ASM  {//implements Observer
 			// ok let it go
 			break;
 		default:
-			 appLogger.addError(String.format("** Check line number %d directive is = %s%n", lineNumber, slp.getDirective()));
+			appLogger.addError(
+					String.format("** Check line number %d directive is = %s%n", lineNumber, slp.getDirective()));
 			// look out for Include
 		}// switch
 
@@ -1320,11 +1342,11 @@ public class ASM  {//implements Observer
 
 	private void reportError(String messsage) {
 		String asterisks = "*************";
-		appLogger.addError(asterisks,messsage,asterisks);
-//		insertListing("*************" + System.lineSeparator(), attrRed); 
-//		insertListing(messsage + System.lineSeparator(), attrRed);
-//		insertListing("*************" + System.lineSeparator(), attrRed);
-//		lblStatus.setText(ERRORS);
+		appLogger.addError(asterisks, messsage, asterisks);
+		// insertListing("*************" + System.lineSeparator(), attrRed);
+		// insertListing(messsage + System.lineSeparator(), attrRed);
+		// insertListing("*************" + System.lineSeparator(), attrRed);
+		// lblStatus.setText(ERRORS);
 	}// reportError
 
 	private void setAttributes() {
@@ -1388,7 +1410,7 @@ public class ASM  {//implements Observer
 		mnuFilePrintSource.setEnabled(false);
 		mnuFilePrintListing.setEnabled(false);
 
-//		symbolTable.addObserver(this);
+		// symbolTable.addObserver(this);
 		//
 		setAttributes();
 	}// appInit
@@ -1510,6 +1532,15 @@ public class ASM  {//implements Observer
 		JButton btnLoadLastFile = new JButton("Load Last File");
 		btnLoadLastFile.setName(BTN_LOAD_LAST_FILE);
 		btnLoadLastFile.addActionListener(adapterForASM);
+
+		rbTerse = new JRadioButton("Terse");
+		rbTerse.setSelected(true);
+		GridBagConstraints gbc_rbTerse = new GridBagConstraints();
+		gbc_rbTerse.anchor = GridBagConstraints.WEST;
+		gbc_rbTerse.insets = new Insets(0, 0, 5, 5);
+		gbc_rbTerse.gridx = 0;
+		gbc_rbTerse.gridy = 8;
+		panelLeft.add(rbTerse, gbc_rbTerse);
 
 		GridBagConstraints gbc_btnLoadLastFile = new GridBagConstraints();
 		gbc_btnLoadLastFile.anchor = GridBagConstraints.NORTH;
@@ -1729,8 +1760,7 @@ public class ASM  {//implements Observer
 	private JMenuItem mnuFilePrintSource;
 	private JMenuItem mnuFilePrintListing;
 	private JLabel lblStatus;
-
-
+	private JRadioButton rbTerse;
 
 	// private static final String
 

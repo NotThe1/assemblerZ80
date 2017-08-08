@@ -751,15 +751,6 @@ public class ASM {// implements Observer
 	// -----------------------------------------------
 
 	private String setMemoryBytesForDirective(SourceLineParts sourceLineParts) {
-		switch (sourceLineParts.getDirective().toUpperCase()) {
-		case "DB":
-		case "DW":
-		case "DS":
-		case "ORG":
-			break;
-		default:
-			return EMPTY_STRING;
-		}// switch
 
 		if (!sourceLineParts.hasArguments()) {
 			String msg = String.format("%s on Line %04d is an invalid argument", sourceLineParts.getDirective(),
@@ -802,7 +793,7 @@ public class ASM {// implements Observer
 				ansInt = resolveSimpleArgument(args, sourceLineParts.getLineNumber()) & 0XFFFF;
 				byte hiByte = (byte) (ansInt >> 8);
 				byte loByte = (byte) (ansInt & 0X00FF);
-				sb.append(String.format("%02X%02X", loByte, hiByte));
+				sb.append(String.format("%02X %02X", loByte, hiByte));
 				locationCount = 2;
 			} // while
 			break;

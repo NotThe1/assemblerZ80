@@ -375,8 +375,12 @@ public class InstructionSet {
 	private static OpCodeNode rootIN() {
 		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);
 		
+//		branch = new OpCodeNode[] { new OpCodeNode(Z80.patLIT_A, Z80.BAD_OPCODE),
+//				 new OpCodeNode(Z80.patIND_C, "IN_1"),new OpCodeNode(Z80.patEXP_ADD, "IN_2") };
+
 		branch = new OpCodeNode[] { new OpCodeNode(Z80.patLIT_A, Z80.BAD_OPCODE),
-				 new OpCodeNode(Z80.patIND_C, "IN_1"),new OpCodeNode(Z80.patEXP_ADD, "IN_2") };
+		new OpCodeNode(Z80.patEXP_ADD, "IN_2") };
+
 		root.addBranch(branch);
 		
 		branch = new OpCodeNode[] { new OpCodeNode(Z80.patR8, Z80.BAD_OPCODE),

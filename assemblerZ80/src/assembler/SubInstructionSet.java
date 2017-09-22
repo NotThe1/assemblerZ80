@@ -254,7 +254,7 @@ public class SubInstructionSet {
 		baseCodes = new byte[] { (byte) 0XED, (byte) 0X78 };
 		subInstructions.put("IN_1", new SubInstruction("IN_1", Z80.LIT_A, Z80.IND_C, baseCodes));
 
-		baseCodes = new byte[] { (byte) 0XDB, (byte) 0X40 };
+		baseCodes = new byte[] { (byte) 0XDB, (byte) 0X00 };
 		subInstructions.put("IN_2", new SubInstruction("IN_2", Z80.LIT_A, Z80.EXP_ADDR, baseCodes));
 
 		baseCodes = new byte[] { (byte) 0XED, (byte) 0X40 };

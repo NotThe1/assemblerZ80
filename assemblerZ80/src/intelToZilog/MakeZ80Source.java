@@ -11,6 +11,8 @@ import java.awt.Insets;
 import java.awt.Point;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.AdjustmentEvent;
+import java.awt.event.AdjustmentListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
@@ -23,6 +25,7 @@ import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.Scanner;
 import java.util.Set;
 import java.util.prefs.Preferences;
 import java.util.regex.Matcher;
@@ -37,6 +40,7 @@ import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JSplitPane;
@@ -56,10 +60,20 @@ import assembler.AppLogger;
 
 public class MakeZ80Source {
 
+	private ApplicationAdapter applicationAdapter = new ApplicationAdapter();
 	private AppLogger log = AppLogger.getInstance();
 	private AdapterLog logAdaper = new AdapterLog();
 	private StyledDocument docIntel;
 	private StyledDocument docZilog;
+	private JScrollBar sbarIntel;
+	private JScrollBar sbarZilog;
+
+	// private Instruction8080 Instruction8080;
+	// private InstructionSet8080 is8080 = new InstructionSet8080();
+	private InstructionSetIntel isIntel = new InstructionSetIntel();
+	private Pattern patternIntel = isIntel.getInstructionPattern();
+	private Matcher matcherIntel;
+
 	private Set<String> symbols = new HashSet<String>();
 
 	private File tempFile;
@@ -84,19 +98,10 @@ public class MakeZ80Source {
 
 	////////////////////////////////////////////////////////////////
 	private void loadIntelFile(File intelFile) {
-
-		String intelFileName = intelFile.getName();
-		// // String asmSourceDirectory = intelFile.getPath();
-		// String[] nameParts = (intelFileName.split("\\."));
-		// sourceFileBase = nameParts[0];
+		// String intelFileName = intelFile.getName();
 
 		lblIntelFile.setToolTipText(intelFile.getAbsolutePath());
 		lblIntelFile.setText(intelFile.getName());
-		// sourceFileFullName = intelFile.getAbsolutePath();
-		// lblSourceFileName.setText(intelFile.getName());
-		// lblListingFileName.setText(sourceFileBase + "." + SUFFIX_LISTING);
-		// defaultDirectory = intelFile.getParent();
-		// outputPathAndBase = defaultDirectory + FILE_SEPARATOR + sourceFileBase;
 		//
 		clearDoc(docIntel);
 		clearDoc(docZilog);
@@ -108,68 +113,329 @@ public class MakeZ80Source {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		loadSourceFile(intelFile, 1, null);
-		// tpSource.setCaretPosition(0);
-		// btnStart.setEnabled(true);
-		//
+		loadSourceFile(intelFile, 1);
 
 	}// loadIntelFile
 
-	private int loadSourceFile(File sourceFile, int lineNumber, SimpleAttributeSet attr) {
+	private int loadSourceFile(File sourceFile, int lineNumber) {
+		SimpleAttributeSet attr;
+		String[] lineParts;
 		try {
 			FileReader source = new FileReader(sourceFile);
 			BufferedReader reader = new BufferedReader(source);
 			String lineIntel = null;
-			String rawLine = null;
-			Matcher matcherList;
-			Pattern patternForList = Pattern.compile("^[0-9]{4}: [0-9A-Fa-f]{4}", Pattern.CASE_INSENSITIVE);
-			Matcher matcherInclude;
-			Pattern patternForInclude = Pattern.compile("< Include >", Pattern.CASE_INSENSITIVE);
-			Matcher matcherTarget;
-			Pattern patternForTarget = Pattern.compile("^[0-9]{4}: [0-9A-Fa-f]{4} [0-9A-Fa-f]{2}",
-					Pattern.CASE_INSENSITIVE);
-			int inIncludeCount = 0;
-			while ((rawLine = reader.readLine()) != null) {
-				 lineIntel = rawLine;
+			boolean instructionOnLine = false;
+			String outputLine;
+			while ((lineIntel = reader.readLine()) != null) {
+				instructionOnLine = false;
+				outputLine = String.format("%04d %s", lineNumber, lineIntel);
+				// outputLine =lineIntel;
 
-				insertIntel(rawLine + System.lineSeparator(), attr);
-				insertZilog(lineIntel + System.lineSeparator(), attr);
+				if (!lineIntel.contains(";")) {
+					matcherIntel = patternIntel.matcher(lineIntel);
+					instructionOnLine = matcherIntel.find() ? true : false;
+				} else if (!lineIntel.startsWith(";")) {
+					lineParts = lineIntel.split(";");
+					matcherIntel = patternIntel.matcher(lineParts[0]);
+					instructionOnLine = matcherIntel.find() ? true : false;
+				} // if
+
+				if (instructionOnLine) {
+					insertIntel(String.format("%04d %s%n", lineNumber, lineIntel), attrBlue);
+					replaceCode(lineNumber, lineIntel, matcherIntel);
+				} else {
+					attr = attrBlack;
+					insertIntel(String.format("%04d %s%n", lineNumber, lineIntel), attrBlack);
+					insertZilog(outputLine + System.lineSeparator(), attrBlack);
+				} // if
+				lineNumber++;
 
 			} // while
-			textIntel.setCaretPosition(0);
-			textZilog.setCaretPosition(0);
 			reader.close();
-			// mnuFilePrintSource.setEnabled(true);
-			// mnuFilePrintListing.setEnabled(false);
 		} catch (IOException e) {
 			String error = String.format("File Not Found!! - %s", sourceFile.getAbsolutePath());
 			log.addError(error);
 		} // TRY
-
+		sbarIntel.setValue(0);
+		sbarZilog.setValue(0);
+		textIntel.updateUI();
+		textZilog.updateUI();
 		return lineNumber;
 	}// loadSourceFile
 
-	public int doInclude(String fileReference, String parentDirectory, int lineNumber) {
+	private void replaceCode(int lineNumber, String originalLine, Matcher matcher) {
+		int end = matcher.end(0);
+		int start = matcher.start(0);
 
-		if (!fileReference.contains("\\")) {
-			fileReference = parentDirectory + System.getProperty("file.separator") + fileReference;
+		String part1 = originalLine.substring(0, start);
+		String part2 = originalLine.substring(start, end);
+		String part3 = originalLine.substring(end);
+
+		String intelInstruction = part2;
+		String zilogInstruction = isIntel.getZilogInstruction(intelInstruction);
+		if (isIntel.isChangeNeeded(intelInstruction)) {
+			switch (isIntel.getConversionType(intelInstruction)) {
+			case None:
+				doNone(lineNumber, originalLine);
+				break;
+			case OnlyInstructionHL:
+				part3 = part3.replaceFirst("M", "\\(HL\\)");
+				doOnlyInstruction(lineNumber, part1, zilogInstruction, part3);
+				break;
+			case OnlyInstruction:
+				doOnlyInstruction(lineNumber, part1, zilogInstruction, part3);
+				break;
+			case Instruction16BitReg:
+				doInstruction16BitReg(lineNumber, part1, zilogInstruction, part3);
+				break;
+			case LogicInstructionHL:
+				doLogicInstructionHL(lineNumber, part1, zilogInstruction, part3);
+				break;
+			case ConditionInstruction:
+				doConditionInstruction(lineNumber, part1, intelInstruction, zilogInstruction, part3);
+				break;
+			case STAX:
+				doStax(lineNumber, part1, zilogInstruction, part3);
+				break;
+			case LDAX:
+				doLdax(lineNumber, part1, zilogInstruction, part3);
+				break;
+			case DAD:
+				doDad(lineNumber, part1, zilogInstruction, part3);
+				break;
+			case RST:
+				doRST(lineNumber, part1, zilogInstruction, part3);
+				break;
+
+			case SBI_ACI:
+				doSbiAci(lineNumber, part1, zilogInstruction, part3);
+				break;
+			// ............
+			case SHLD:
+				String address = getAddress(part3);
+				part3 = part3.replaceFirst(address, "(" + address + "),HL");
+				doOnlyInstruction( lineNumber,  part1,  zilogInstruction,  part3);
+				break;
+			case LHLD:
+				 address = getAddress(part3);
+				part3 = part3.replaceFirst(address, "HL,(" + address + ")");
+				doOnlyInstruction( lineNumber,  part1,  zilogInstruction,  part3);
+				break;
+			case STA:
+				 address = getAddress(part3);
+				part3 = part3.replaceFirst(address, "(" + address + "),A");
+				doOnlyInstruction( lineNumber,  part1,  zilogInstruction,  part3);
+				break;
+			case LDA:
+				 address = getAddress(part3);
+				part3 = part3.replaceFirst(address, "A,(" + address + ")");
+				doOnlyInstruction( lineNumber,  part1,  zilogInstruction,  part3);
+				break;
+			case PCHL:
+				part3 = "(HL) " + part3;
+				doOnlyInstruction( lineNumber,  part1,  zilogInstruction,  part3);
+				break;
+			case SPHL:
+				part3 = "\tSP,HL " + part3.trim();
+				doOnlyInstruction( lineNumber,  part1,  zilogInstruction,  part3);
+				break;
+			case XCHG:
+				part3 = "\tDE,HL " + part3.trim();
+				doOnlyInstruction( lineNumber,  part1,  zilogInstruction,  part3);
+				break;
+			case XTHL:
+				part3 = "\t(SP),HL " + part3.trim();
+				doOnlyInstruction( lineNumber,  part1,  zilogInstruction,  part3);
+				break;
+			case OUT:
+				 address = getAddress(part3);
+				part3 = part3.replaceFirst(address, "(" + address + "),A");
+				doOnlyInstruction( lineNumber,  part1,  zilogInstruction,  part3);
+				break;
+			case IN:
+				 address = getAddress(part3);
+				part3 = part3.replaceFirst(address, "A,(" + address + ")");
+				doOnlyInstruction( lineNumber,  part1,  zilogInstruction,  part3);
+				break;
+
+			}// switch SBI_ACI
+
+		} else {
+			insertZilog(String.format("%04d %s%s%s%n", lineNumber, part1, part2, part3), attrBlue);
+			// if needs change
+		} // if needs change
+			// Scanner scanner = new Scanner(part3);
+			//
+			// // String arg = scanner.next();
+			// String ans = scanner.hasNext() ? scanner.next() : EMPTY_STRING;
+			// scanner.close();
+			//
+
+		return;
+	}// replaceCode
+	
+	private String getAddress(String part3) {
+		String ans = EMPTY_STRING;
+		Scanner scanner = new Scanner(part3);
+		if (scanner.hasNext()) {
+			ans = scanner.next();
+		}//if
+		scanner.close();
+		return ans;
+	}//
+
+	private void doNone(int lineNumber, String originalLine) {
+		insertZilog(String.format("%04d %s%s%s%n", lineNumber, originalLine), attrBlue);
+	}// ddoNone
+
+	private void doOnlyInstruction(int lineNumber, String part1, String zilogInstruction, String part3) {
+		insertZilog(String.format("%04d %s", lineNumber, part1), attrBlue);
+		insertZilog(zilogInstruction, attrRed);
+		insertZilog(part3 + System.lineSeparator(), attrBlue);
+
+	}// doOnlyInstruction
+
+	private void doInstruction16BitReg(int lineNumber, String part1, String zilogInstruction, String part3) {
+		insertZilog(String.format("%04d %s", lineNumber, part1), attrBlue);
+		insertZilog(zilogInstruction, attrRed);
+		switch (part3.trim().substring(0, 1)) {
+		case "B":
+			part3 = part3.replaceFirst("B", "BC");
+			break;
+		case "D":
+			part3 = part3.replaceFirst("D", "DE");
+			break;
+		case "H":
+			part3 = part3.replaceFirst("H", "HL");
+			break;
+		case "P":
+			part3 = part3.replaceFirst("PSW", "AF");
+			break;
+		case "S":
+			// ignore its SP
+			break;
+		}// switch
+		insertZilog(part3 + System.lineSeparator(), attrBlue);
+	}// doInstruction16BitReg
+
+	private void doLogicInstructionHL(int lineNumber, String part1, String zilogInstruction, String part3) {
+		insertZilog(String.format("%04d %s", lineNumber, part1), attrBlue);
+		insertZilog(zilogInstruction, attrRed);
+		switch (part3.trim().substring(0, 1)) {
+		case "A":
+			part3 = part3.replaceFirst("A", "A,A");
+			break;
+		case "B":
+			part3 = part3.replaceFirst("B", "A,B");
+			break;
+		case "C":
+			part3 = part3.replaceFirst("C", "A,C");
+			break;
+		case "D":
+			part3 = part3.replaceFirst("D", "A,D");
+			break;
+		case "E":
+			part3 = part3.replaceFirst("E", "A,E");
+			break;
+		case "H":
+			part3 = part3.replaceFirst("H", "A,H");
+			break;
+		case "L":
+			part3 = part3.replaceFirst("L", "A,L");
+			break;
+		case "M":
+			part3 = part3.replaceFirst("M", "A,(HL)");
+			break;
+		case "S":
+			// ignore its SP
+			break;
+		}// switch
+		insertZilog(part3 + System.lineSeparator(), attrBlue);
+	}// doInstruction16BitReg
+
+	private void doConditionInstruction(int lineNumber, String part1, String intelInstruction, String zilogInstruction,
+			String part3) {
+		insertZilog(String.format("%04d %s", lineNumber, part1), attrBlue);
+		insertZilog(zilogInstruction, attrRed);
+		String newPart3;
+		if (zilogInstruction.equals("RET")) {
+			newPart3 = String.format("\t%s%s", intelInstruction.trim().substring(1), part3.trim());
+		} else {
+			newPart3 = String.format("\t%s,%s", intelInstruction.trim().substring(1), part3.trim());
+		} // if return
+		insertZilog(newPart3 + System.lineSeparator(), attrBlue);
+	}// doLogicInstructionHL
+
+	private void doStax(int lineNumber, String part1, String zilogInstruction, String part3) {
+		insertZilog(String.format("%04d %s", lineNumber, part1), attrBlue);
+		insertZilog(zilogInstruction, attrRed);
+		String newPart3;
+		if (part3.trim().startsWith("B")) {
+			newPart3 = part3.replaceFirst("B", "(BC),A");
+		} else if (part3.trim().startsWith("D")) {
+			newPart3 = part3.replaceFirst("D", "(DE),A");
+		} else {
+			newPart3 = "***** Bad Conversion *****";
 		} //
+		insertZilog(newPart3 + System.lineSeparator(), attrBlue);
+	}// doStax
 
-		// if (!(fileReference.toUpperCase().endsWith(SUFFIX_ASSEMBLER.toUpperCase()))) {
-		// fileReference += "." + SUFFIX_ASSEMBLER;
-		// } //
+	private void doLdax(int lineNumber, String part1, String zilogInstruction, String part3) {
+		insertZilog(String.format("%04d %s", lineNumber, part1), attrBlue);
+		insertZilog(zilogInstruction, attrRed);
+		String newPart3;
+		if (part3.trim().startsWith("B")) {
+			newPart3 = part3.replaceFirst("B", "A,(BC)");
+		} else if (part3.trim().startsWith("D")) {
+			newPart3 = part3.replaceFirst("D", "A,(DE)");
+		} else {
+			newPart3 = "***** Bad Conversion *****";
+		} //
+		insertZilog(newPart3 + System.lineSeparator(), attrBlue);
+	}// doLdax
 
-		// * String includeMarker = ";<<<<<<<<<<<<<<<<<<<<<<< Include >>>>>>>>>>>>>>>>";
-		// insertSource(String.format("%04d %s%n", lineNumber++, includeMarker), attrBlue);
-		//
-		// File includedFile = new File(fileReference);
-		// lineNumber = loadSourceFile(includedFile, lineNumber, attrBlue);
-		//
-		// * insertSource(String.format("%04d %s%n", lineNumber++, includeMarker), attrBlue);
-		//
-		return lineNumber;
-	}// doInclude
+	private void doDad(int lineNumber, String part1, String zilogInstruction, String part3) {
+		insertZilog(String.format("%04d %s", lineNumber, part1), attrBlue);
+		insertZilog(zilogInstruction, attrRed);
+		String newPart3;
+		switch (part3.trim().substring(0, 1)) {
+		case "B":
+			newPart3 = part3.replaceFirst("B", "HL,BC");
+			break;
+		case "D":
+			newPart3 = part3.replaceFirst("D", "HL,DE");
+			break;
+		case "H":
+			newPart3 = part3.replaceFirst("H", "HL,HL");
+			break;
+		case "S":
+			newPart3 = part3.replaceFirst("SP", "HL,SP");
+			break;
+		default:
+			newPart3 = "***** Bad Conversion *****";
+			break;
+		}// switch
+		insertZilog(newPart3 + System.lineSeparator(), attrBlue);
+	}// doDad
 
+	private void doRST(int lineNumber, String part1, String zilogInstruction, String part3) {
+		insertZilog(String.format("%04d %s", lineNumber, part1), attrBlue);
+		insertZilog(zilogInstruction, attrRed);
+
+		int value = Integer.valueOf(part3.trim().substring(0, 1));
+		String newPart3 = String.format("\t%02XH%s", value * 8, part3.trim().substring(1));
+
+		insertZilog(newPart3 + System.lineSeparator(), attrBlue);
+	}// doStack
+
+	private void doSbiAci(int lineNumber, String part1, String zilogInstruction, String part3) {
+		insertZilog(String.format("%04d %s", lineNumber, part1), attrBlue);
+		insertZilog(zilogInstruction, attrRed);
+
+		insertZilog("\tA," + part3.trim() + System.lineSeparator(), attrBlue);
+	}// doSbiAci
+
+	//////////////////// .........................................
 	private void insertZilog(String str, SimpleAttributeSet attr) {
 		try {
 			docZilog.insertString(docZilog.getLength(), str, attr);
@@ -198,7 +464,8 @@ public class MakeZ80Source {
 	////////////////////////////////////////////////////////////////
 
 	private void doBtnOne() {
-
+		sbarIntel.setValue(0);
+		sbarZilog.setValue(0);
 	}// doBtnOne
 
 	private void doBtnTwo() {
@@ -212,12 +479,6 @@ public class MakeZ80Source {
 	private void doBtnFour() {
 
 	}// doBtnFour
-
-	// ---------------------------------------------------------
-
-	private void doFileNew() {
-
-	}// doFileNew
 
 	private void doFileOpen() {
 		FileNameExtensionFilter filter = new FileNameExtensionFilter("Source Files", "asm", "z80");
@@ -463,6 +724,7 @@ public class MakeZ80Source {
 		panelMain.setLayout(gbl_panelMain);
 
 		splitPaneCode = new JSplitPane();
+		splitPaneCode.setOrientation(JSplitPane.VERTICAL_SPLIT);
 		splitPaneCode.setOneTouchExpandable(true);
 		GridBagConstraints gbc_splitPaneCode = new GridBagConstraints();
 		gbc_splitPaneCode.fill = GridBagConstraints.BOTH;
@@ -470,30 +732,34 @@ public class MakeZ80Source {
 		gbc_splitPaneCode.gridy = 0;
 		panelMain.add(splitPaneCode, gbc_splitPaneCode);
 
-		JScrollPane scrollPane = new JScrollPane();
-		splitPaneCode.setLeftComponent(scrollPane);
+		JScrollPane scrollPaneIntel = new JScrollPane();
+		splitPaneCode.setLeftComponent(scrollPaneIntel);
 
 		textIntel = new JTextPane();
 		textIntel.setEditable(false);
-		textIntel.setFont(new Font("Courier New", Font.PLAIN, 11));
-		scrollPane.setViewportView(textIntel);
+		textIntel.setFont(new Font("Courier New", Font.PLAIN, 14));
+		sbarIntel = scrollPaneIntel.getVerticalScrollBar();
+		sbarIntel.addAdjustmentListener(applicationAdapter);
+		scrollPaneIntel.setViewportView(textIntel);
 
 		lblIntelFile = new JLabel(NO_FILE);
 		lblIntelFile.setFont(new Font("Trebuchet MS", Font.BOLD, 14));
 		lblIntelFile.setHorizontalAlignment(SwingConstants.CENTER);
-		scrollPane.setColumnHeaderView(lblIntelFile);
+		scrollPaneIntel.setColumnHeaderView(lblIntelFile);
 
-		JScrollPane scrollPane_1 = new JScrollPane();
-		splitPaneCode.setRightComponent(scrollPane_1);
+		JScrollPane scrollPaneZilog = new JScrollPane();
+		splitPaneCode.setRightComponent(scrollPaneZilog);
 
 		textZilog = new JTextPane();
-		textZilog.setFont(new Font("Courier New", Font.PLAIN, 11));
-		scrollPane_1.setViewportView(textZilog);
+		textZilog.setFont(new Font("Courier New", Font.PLAIN, 14));
+		sbarZilog = scrollPaneZilog.getVerticalScrollBar();
+		sbarZilog.addAdjustmentListener(applicationAdapter);
+		scrollPaneZilog.setViewportView(textZilog);
 
 		lblZilogFile = new JLabel(NO_FILE);
 		lblZilogFile.setHorizontalAlignment(SwingConstants.CENTER);
 		lblZilogFile.setFont(new Font("Trebuchet MS", Font.BOLD, 14));
-		scrollPane_1.setColumnHeaderView(lblZilogFile);
+		scrollPaneZilog.setColumnHeaderView(lblZilogFile);
 
 		txtLog = new JTextPane();
 		scrollPaneForLog.setViewportView(txtLog);
@@ -535,61 +801,30 @@ public class MakeZ80Source {
 		JMenu mnuFile = new JMenu("File");
 		menuBar.add(mnuFile);
 
-		JMenuItem mnuFileNew = new JMenuItem("New");
-		mnuFileNew.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent arg0) {
-				doFileNew();
-			}
-		});
-		mnuFile.add(mnuFileNew);
-
 		JMenuItem mnuFileOpen = new JMenuItem("Open...");
-		mnuFileOpen.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent arg0) {
-				doFileOpen();
-			}
-		});
+		mnuFileOpen.setName(MNU_FILE_OPEN);
+		mnuFileOpen.addActionListener(applicationAdapter);
 		mnuFile.add(mnuFileOpen);
 
 		JSeparator separator99 = new JSeparator();
 		mnuFile.add(separator99);
 
 		JMenuItem mnuFileSave = new JMenuItem("Save...");
-		mnuFileSave.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent arg0) {
-				doFileSave();
-			}
-		});
+		mnuFileSave.setName(MNU_FILE_SAVE);
+		mnuFileSave.addActionListener(applicationAdapter);
 		mnuFile.add(mnuFileSave);
 
 		JMenuItem mnuFileSaveAs = new JMenuItem("Save As...");
-		mnuFileSaveAs.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent arg0) {
-				doFileSaveAs();
-			}
-		});
+		mnuFileSaveAs.setName(MNU_FILE_SAVE_AS);
+		mnuFileSaveAs.addActionListener(applicationAdapter);
 		mnuFile.add(mnuFileSaveAs);
 
 		JSeparator separator_2 = new JSeparator();
 		mnuFile.add(separator_2);
 
-		JMenuItem mnuFilePrint = new JMenuItem("Print...");
-		mnuFilePrint.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent arg0) {
-				doFilePrint();
-			}
-		});
-		mnuFile.add(mnuFilePrint);
-
-		JSeparator separator_1 = new JSeparator();
-		mnuFile.add(separator_1);
-
 		JMenuItem mnuFileExit = new JMenuItem("Exit");
-		mnuFileExit.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent arg0) {
-				doFileExit();
-			}
-		});
+		mnuFileExit.setName(MNU_FILE_EXIT);
+		mnuFileExit.addActionListener(applicationAdapter);
 		mnuFile.add(mnuFileExit);
 
 	}// initialize
@@ -604,9 +839,48 @@ public class MakeZ80Source {
 	static final String EMPTY_STRING = "";
 	static final String NO_FILE = "<<No File>>";
 
-	//////////////////////////////////////////////////////////////////////////
+	private static final String MNU_FILE_OPEN = "mnuFileOpen";
+	private static final String MNU_FILE_SAVE = "mnuFileSave";
+	private static final String MNU_FILE_SAVE_AS = "mnuFileSaveAs";
+	private static final String MNU_FILE_EXIT = "mnuFileExit";
 
-	class AdapterLog implements ActionListener {// , ListSelectionListener
+	//////////////////////////////////////////////////////////////////////////
+	class ApplicationAdapter implements ActionListener, AdjustmentListener {
+
+		@Override
+		public void adjustmentValueChanged(AdjustmentEvent adjustmentEvent) {
+			if (adjustmentEvent.getSource() instanceof JScrollBar) {
+				int value = ((JScrollBar) adjustmentEvent.getSource()).getValue();
+				sbarIntel.setValue(value);
+				sbarZilog.setValue(value);
+			} // if scroll bar
+
+		}// adjustmentValueChanged
+
+		/* ActionListener */
+		@Override
+		public void actionPerformed(ActionEvent actionEvent) {
+			String name = ((Component) actionEvent.getSource()).getName();
+			switch (name) {
+			case MNU_FILE_OPEN:
+				doFileOpen();
+				break;
+			case MNU_FILE_SAVE:
+				doFileSave();
+				break;
+			case MNU_FILE_SAVE_AS:
+				doFileSaveAs();
+				break;
+			case MNU_FILE_EXIT:
+				doFileExit();
+				break;
+			}// switch
+		}
+
+	}
+
+	class AdapterLog implements ActionListener {//
+		/* ActionListener */
 		@Override
 		public void actionPerformed(ActionEvent actionEvent) {
 			String name = ((Component) actionEvent.getSource()).getName();
@@ -619,6 +893,9 @@ public class MakeZ80Source {
 				break;
 			}// switch
 		}// actionPerformed
+
+		/* AdjustmentListener */
+
 	}// class AdapterAction
 
 	private static void addPopup(Component component, final JPopupMenu popup) {

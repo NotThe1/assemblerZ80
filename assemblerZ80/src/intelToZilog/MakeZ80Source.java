@@ -274,7 +274,7 @@ public class MakeZ80Source {
 				break;
 			case LDA:
 				address = getAddress(part3);
-				part3 = part3.replaceFirst(address, "A,(" + address + ")");
+				part3 = part3.replaceFirst(address, " A,(" + address + ")");
 				doOnlyInstruction(lineNumber, part1, zilogInstruction, part3);
 				break;
 			case PCHL:
@@ -323,6 +323,7 @@ public class MakeZ80Source {
 	private String getAddress(String part3) {
 		String ans = EMPTY_STRING;
 		Scanner scanner = new Scanner(part3);
+//		scanner.useDelimiter(";");
 		if (scanner.hasNext()) {
 			ans = scanner.next();
 		} // if
@@ -433,13 +434,21 @@ public class MakeZ80Source {
 		insertZilog(String.format("%04d %s", lineNumber, part1), attrBlue);
 		insertZilog(zilogInstruction, attrRed);
 		String newPart3;
-		if (part3.trim().startsWith("B")) {
-			newPart3 = part3.replaceFirst("B", "A,(BC)");
-		} else if (part3.trim().startsWith("D")) {
-			newPart3 = part3.replaceFirst("D", "A,(DE)");
-		} else {
+		String arg = part3.trim();
+		String reg;
+		switch (part3.trim().substring(0, 1)) {
+		case "B":
+			reg = arg.startsWith("BC")?"BC":"B";
+			newPart3 = part3.replaceFirst(reg, "A,(BC)");
+			break;
+		case "D":
+			reg = arg.startsWith("DE")?"DE":"D";
+			newPart3 = part3.replaceFirst(reg, "A,(DE)");
+			break;
+		default:
 			newPart3 = "***** Bad Conversion *****";
-		} //
+			break;	
+		}//switch
 		insertZilog(newPart3 + System.lineSeparator(), attrBlue);
 	}// doLdax
 

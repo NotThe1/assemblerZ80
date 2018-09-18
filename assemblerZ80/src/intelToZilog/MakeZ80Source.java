@@ -21,7 +21,11 @@ import java.awt.print.PrinterException;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.text.MessageFormat;
 import java.util.Date;
 import java.util.HashSet;
@@ -68,15 +72,14 @@ public class MakeZ80Source {
 	private JScrollBar sbarIntel;
 	private JScrollBar sbarZilog;
 
-	// private Instruction8080 Instruction8080;
-	// private InstructionSet8080 is8080 = new InstructionSet8080();
 	private InstructionSetIntel isIntel = new InstructionSetIntel();
 	private Pattern patternIntel = isIntel.getInstructionPattern();
 	private Matcher matcherIntel;
 
 	private Set<String> symbols = new HashSet<String>();
 
-	private File tempFile;
+	private String codeBaseIntel;
+	private String codeBaseZilog;
 
 	/**
 	 * Launch the application.
@@ -97,6 +100,44 @@ public class MakeZ80Source {
 	/* Standard Stuff */
 
 	////////////////////////////////////////////////////////////////
+	private void saveZilogFile(File zilogFile) {
+//		Files.deleteIfExists(Paths.get(zilogFile));
+		String zilogLine;
+		try {
+			Scanner scanner = new Scanner(textZilog.getText());
+			FileWriter destination = new FileWriter(zilogFile);
+			PrintWriter pwDestination = new PrintWriter(destination);
+			zilogLine = scanner.nextLine();
+			log.addInfo(zilogLine);		
+			pwDestination.println(zilogLine);
+			
+			zilogLine = scanner.nextLine();
+			if (zilogLine.length()==0) {
+				zilogLine = scanner.nextLine();	
+			}//
+			
+//			zilogLine = scanner.nextLine();
+			log.addInfo(zilogLine);
+			pwDestination.println(zilogLine);
+			
+
+			while (scanner.hasNextLine()) {
+				scanner.next(); // skip the line number
+				zilogLine = scanner.nextLine();
+				log.addInfo(zilogLine);
+				pwDestination.println(zilogLine);
+			} // while
+
+			destination.close();
+			pwDestination.close();
+			scanner.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		} //
+
+	}// saveZilogFile
+
+	/////// :::::::::::::::::::::::::::::::::::::::::::::::::
 	private void loadIntelFile(File intelFile) {
 		// String intelFileName = intelFile.getName();
 
@@ -105,21 +146,24 @@ public class MakeZ80Source {
 		//
 		clearDoc(docIntel);
 		clearDoc(docZilog);
-		try {
-			tempFile = File.createTempFile(Long.toString(System.currentTimeMillis()), null);
-			tempFile.deleteOnExit();
-			System.out.println(tempFile.getAbsolutePath());
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		// try {
+		// tempFile = File.createTempFile(Long.toString(System.currentTimeMillis()), null);
+		// tempFile.deleteOnExit();
+		// System.out.println(tempFile.getAbsolutePath());
+		// } catch (IOException e) {
+		// // TODO Auto-generated catch block
+		// e.printStackTrace();
+		// }
 		loadSourceFile(intelFile, 1);
 
 	}// loadIntelFile
 
 	private int loadSourceFile(File sourceFile, int lineNumber) {
-		SimpleAttributeSet attr;
 		String[] lineParts;
+		String line = String.format(";     File created by MakeZ80Source on %s from:", new Date());
+		insertZilog(line + System.lineSeparator(), attrGreen);
+		line = String.format(";     %s",sourceFile.getAbsolutePath());
+		insertZilog(line + System.lineSeparator(), attrMaroon);
 		try {
 			FileReader source = new FileReader(sourceFile);
 			BufferedReader reader = new BufferedReader(source);
@@ -144,7 +188,7 @@ public class MakeZ80Source {
 					insertIntel(String.format("%04d %s%n", lineNumber, lineIntel), attrBlue);
 					replaceCode(lineNumber, lineIntel, matcherIntel);
 				} else {
-					attr = attrBlack;
+					// attr = attrBlack;
 					insertIntel(String.format("%04d %s%n", lineNumber, lineIntel), attrBlack);
 					insertZilog(outputLine + System.lineSeparator(), attrBlack);
 				} // if
@@ -156,6 +200,7 @@ public class MakeZ80Source {
 			String error = String.format("File Not Found!! - %s", sourceFile.getAbsolutePath());
 			log.addError(error);
 		} // TRY
+		insertZilog("!END ",attrMaroon);
 		sbarIntel.setValue(0);
 		sbarZilog.setValue(0);
 		textIntel.updateUI();
@@ -179,7 +224,8 @@ public class MakeZ80Source {
 				doNone(lineNumber, originalLine);
 				break;
 			case OnlyInstructionHL:
-				part3 = part3.replaceFirst("M", "\\(HL\\)");
+				part3 = part3.replaceFirst("M,", "\\(HL\\),");
+				part3 = part3.replaceFirst(",M", ",\\(HL\\)");
 				doOnlyInstruction(lineNumber, part1, zilogInstruction, part3);
 				break;
 			case OnlyInstruction:
@@ -214,48 +260,48 @@ public class MakeZ80Source {
 			case SHLD:
 				String address = getAddress(part3);
 				part3 = part3.replaceFirst(address, "(" + address + "),HL");
-				doOnlyInstruction( lineNumber,  part1,  zilogInstruction,  part3);
+				doOnlyInstruction(lineNumber, part1, zilogInstruction, part3);
 				break;
 			case LHLD:
-				 address = getAddress(part3);
+				address = getAddress(part3);
 				part3 = part3.replaceFirst(address, "HL,(" + address + ")");
-				doOnlyInstruction( lineNumber,  part1,  zilogInstruction,  part3);
+				doOnlyInstruction(lineNumber, part1, zilogInstruction, part3);
 				break;
 			case STA:
-				 address = getAddress(part3);
+				address = getAddress(part3);
 				part3 = part3.replaceFirst(address, "(" + address + "),A");
-				doOnlyInstruction( lineNumber,  part1,  zilogInstruction,  part3);
+				doOnlyInstruction(lineNumber, part1, zilogInstruction, part3);
 				break;
 			case LDA:
-				 address = getAddress(part3);
+				address = getAddress(part3);
 				part3 = part3.replaceFirst(address, "A,(" + address + ")");
-				doOnlyInstruction( lineNumber,  part1,  zilogInstruction,  part3);
+				doOnlyInstruction(lineNumber, part1, zilogInstruction, part3);
 				break;
 			case PCHL:
 				part3 = "(HL) " + part3;
-				doOnlyInstruction( lineNumber,  part1,  zilogInstruction,  part3);
+				doOnlyInstruction(lineNumber, part1, zilogInstruction, part3);
 				break;
 			case SPHL:
 				part3 = "\tSP,HL " + part3.trim();
-				doOnlyInstruction( lineNumber,  part1,  zilogInstruction,  part3);
+				doOnlyInstruction(lineNumber, part1, zilogInstruction, part3);
 				break;
 			case XCHG:
 				part3 = "\tDE,HL " + part3.trim();
-				doOnlyInstruction( lineNumber,  part1,  zilogInstruction,  part3);
+				doOnlyInstruction(lineNumber, part1, zilogInstruction, part3);
 				break;
 			case XTHL:
 				part3 = "\t(SP),HL " + part3.trim();
-				doOnlyInstruction( lineNumber,  part1,  zilogInstruction,  part3);
+				doOnlyInstruction(lineNumber, part1, zilogInstruction, part3);
 				break;
 			case OUT:
-				 address = getAddress(part3);
+				address = getAddress(part3);
 				part3 = part3.replaceFirst(address, "(" + address + "),A");
-				doOnlyInstruction( lineNumber,  part1,  zilogInstruction,  part3);
+				doOnlyInstruction(lineNumber, part1, zilogInstruction, part3);
 				break;
 			case IN:
-				 address = getAddress(part3);
+				address = getAddress(part3);
 				part3 = part3.replaceFirst(address, "A,(" + address + ")");
-				doOnlyInstruction( lineNumber,  part1,  zilogInstruction,  part3);
+				doOnlyInstruction(lineNumber, part1, zilogInstruction, part3);
 				break;
 
 			}// switch SBI_ACI
@@ -273,13 +319,13 @@ public class MakeZ80Source {
 
 		return;
 	}// replaceCode
-	
+
 	private String getAddress(String part3) {
 		String ans = EMPTY_STRING;
 		Scanner scanner = new Scanner(part3);
 		if (scanner.hasNext()) {
 			ans = scanner.next();
-		}//if
+		} // if
 		scanner.close();
 		return ans;
 	}//
@@ -298,23 +344,26 @@ public class MakeZ80Source {
 	private void doInstruction16BitReg(int lineNumber, String part1, String zilogInstruction, String part3) {
 		insertZilog(String.format("%04d %s", lineNumber, part1), attrBlue);
 		insertZilog(zilogInstruction, attrRed);
-		switch (part3.trim().substring(0, 1)) {
-		case "B":
-			part3 = part3.replaceFirst("B", "BC");
-			break;
-		case "D":
-			part3 = part3.replaceFirst("D", "DE");
-			break;
-		case "H":
-			part3 = part3.replaceFirst("H", "HL");
-			break;
-		case "P":
-			part3 = part3.replaceFirst("PSW", "AF");
-			break;
-		case "S":
-			// ignore its SP
-			break;
-		}// switch
+		String newPart3 = part3.trim();
+		if (!(newPart3.startsWith("BC") | newPart3.startsWith("DE") | newPart3.startsWith("HL"))) {
+			switch (part3.trim().substring(0, 1)) {
+			case "B":
+				part3 = part3.replaceFirst("B", "BC");
+				break;
+			case "D":
+				part3 = part3.replaceFirst("D", "DE");
+				break;
+			case "H":
+				part3 = part3.replaceFirst("H", "HL");
+				break;
+			case "P":
+				part3 = part3.replaceFirst("PSW", "AF");
+				break;
+			case "S":
+				// ignore its SP
+				break;
+			}// switch
+		} // if
 		insertZilog(part3 + System.lineSeparator(), attrBlue);
 	}// doInstruction16BitReg
 
@@ -398,15 +447,20 @@ public class MakeZ80Source {
 		insertZilog(String.format("%04d %s", lineNumber, part1), attrBlue);
 		insertZilog(zilogInstruction, attrRed);
 		String newPart3;
+		String arg = part3.trim();
+		String reg;
 		switch (part3.trim().substring(0, 1)) {
 		case "B":
-			newPart3 = part3.replaceFirst("B", "HL,BC");
+			reg = arg.startsWith("BC")?"BC":"B";
+			newPart3 = part3.replaceFirst(reg, "HL,BC");
 			break;
 		case "D":
-			newPart3 = part3.replaceFirst("D", "HL,DE");
+			reg = arg.startsWith("DE")?"DE":"D";
+			newPart3 = part3.replaceFirst(reg, "HL,DE");
 			break;
 		case "H":
-			newPart3 = part3.replaceFirst("H", "HL,HL");
+			reg = arg.startsWith("HL")?"HL":"H";
+			newPart3 = part3.replaceFirst(reg, "HL,HL");
 			break;
 		case "S":
 			newPart3 = part3.replaceFirst("SP", "HL,SP");
@@ -476,13 +530,9 @@ public class MakeZ80Source {
 
 	}// doBtnThree
 
-	private void doBtnFour() {
-
-	}// doBtnFour
-
 	private void doFileOpen() {
 		FileNameExtensionFilter filter = new FileNameExtensionFilter("Source Files", "asm", "z80");
-		JFileChooser fileChooser = new JFileChooser(SOURCE_8080);
+		JFileChooser fileChooser = new JFileChooser(codeBaseIntel);
 		fileChooser.setMultiSelectionEnabled(false);
 		fileChooser.addChoosableFileFilter(filter);
 		fileChooser.setAcceptAllFileFilterUsed(false);
@@ -491,25 +541,60 @@ public class MakeZ80Source {
 			System.out.println("Bailed out of the open");
 			return;
 		} // if - open
+		codeBaseIntel = fileChooser.getSelectedFile().getParent();
 		loadIntelFile(fileChooser.getSelectedFile());
+		manageMenusAndButtons();
 	}// doFileOpen
 
-	private void doFileSave() {
-
-	}// doFileSave
+	// private void doFileSave() {
+	//
+	// }// doFileSave
 
 	private void doFileSaveAs() {
+		FileNameExtensionFilter filter = new FileNameExtensionFilter("Source Files", "asm", "z80");
+		JFileChooser fileChooser = new JFileChooser(codeBaseZilog);
+		fileChooser.setMultiSelectionEnabled(false);
+		fileChooser.addChoosableFileFilter(filter);
+		fileChooser.setAcceptAllFileFilterUsed(false);
+
+		if (fileChooser.showSaveDialog(frmTemplate) == JFileChooser.CANCEL_OPTION) {
+			System.out.println("Bailed out of the open");
+			return;
+		} // if - open
+		File selectedFile = fileChooser.getSelectedFile();
+		codeBaseZilog = selectedFile.getParent();
+		
+		String fileName = fileChooser.getSelectedFile().getAbsolutePath();
+		String[] parts = fileName.split("\\.");
+		
+		fileName = parts[0] + ".Z80";
+		
+		try {
+			Files.deleteIfExists(Paths.get(fileName));
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		saveZilogFile(new File(fileName));
+		
 
 	}// doFileSaveAs
 
-	private void doFilePrint() {
-
-	}// doFilePrint
+	// private void doFilePrint() {
+	//
+	// }// doFilePrint
 
 	private void doFileExit() {
 		appClose();
 		System.exit(0);
 	}// doFileExit
+
+	private void manageMenusAndButtons() {
+		boolean haveZilogFile = docIntel.getLength() != 0 ? true : false;
+		mnuFileSaveAs.setEnabled(haveZilogFile);
+		btnFileSaveAs.setEnabled(haveZilogFile);
+	}// manageMenusAndButtons
 
 	//////////////////////////////////////////////////
 
@@ -536,6 +621,9 @@ public class MakeZ80Source {
 		myPrefs.putInt("LocY", point.y);
 		myPrefs.putInt("DividerMain", splitPane1Main.getDividerLocation());
 		myPrefs.putInt("DividerCode", splitPaneCode.getDividerLocation());
+
+		myPrefs.put("IntelBase", codeBaseIntel);
+		myPrefs.put("ZilogBase", codeBaseZilog);
 		myPrefs = null;
 
 	}// appClose
@@ -546,6 +634,9 @@ public class MakeZ80Source {
 		frmTemplate.setLocation(myPrefs.getInt("LocX", 100), myPrefs.getInt("LocY", 100));
 		splitPane1Main.setDividerLocation(myPrefs.getInt("DividerMain", 250));
 		splitPaneCode.setDividerLocation(myPrefs.getInt("DividerCode", 250));
+
+		codeBaseIntel = myPrefs.get("IntelBase", INTEL_BASE);
+		codeBaseZilog = myPrefs.get("ZilogBase", ZILOG_BASE);
 		myPrefs = null;
 		setAttributes();
 		symbols.add("$");
@@ -559,6 +650,7 @@ public class MakeZ80Source {
 		log.setDoc(txtLog.getStyledDocument());
 		log.addInfo("Starting...");
 
+		manageMenusAndButtons();
 	}// appInit
 
 	public MakeZ80Source() {
@@ -623,69 +715,45 @@ public class MakeZ80Source {
 		gbl_panelForButtons.rowWeights = new double[] { 0.0, Double.MIN_VALUE };
 		panelForButtons.setLayout(gbl_panelForButtons);
 
-		btnOne = new JButton("Button 1");
-		btnOne.setMinimumSize(new Dimension(100, 20));
-		GridBagConstraints gbc_btnOne = new GridBagConstraints();
-		gbc_btnOne.insets = new Insets(0, 0, 0, 5);
-		gbc_btnOne.gridx = 0;
-		gbc_btnOne.gridy = 0;
-		panelForButtons.add(btnOne, gbc_btnOne);
-		btnOne.setAlignmentX(Component.RIGHT_ALIGNMENT);
-		btnOne.setBorder(new SoftBevelBorder(BevelBorder.LOWERED, null, null, null, null));
-		btnOne.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent arg0) {
-				doBtnOne();
-			}
-		});
-		btnOne.setMaximumSize(new Dimension(0, 0));
-		btnOne.setPreferredSize(new Dimension(100, 20));
+		btnLoadIntelFile = new JButton("Load Intel File");
+		btnLoadIntelFile.setName(BTN_FILE_LOAD);
+		btnLoadIntelFile.addActionListener(applicationAdapter);
+		btnLoadIntelFile.setMinimumSize(new Dimension(100, 20));
+		GridBagConstraints gbc_btnLoadIntelFile = new GridBagConstraints();
+		gbc_btnLoadIntelFile.insets = new Insets(0, 0, 0, 5);
+		gbc_btnLoadIntelFile.gridx = 0;
+		gbc_btnLoadIntelFile.gridy = 0;
+		panelForButtons.add(btnLoadIntelFile, gbc_btnLoadIntelFile);
+		btnLoadIntelFile.setAlignmentX(Component.RIGHT_ALIGNMENT);
+		btnLoadIntelFile.setBorder(new SoftBevelBorder(BevelBorder.LOWERED, null, null, null, null));
+		btnLoadIntelFile.setMaximumSize(new Dimension(0, 0));
+		btnLoadIntelFile.setPreferredSize(new Dimension(100, 20));
 
-		btnTwo = new JButton("Button 2");
-		btnTwo.setMinimumSize(new Dimension(100, 20));
-		GridBagConstraints gbc_btnTwo = new GridBagConstraints();
-		gbc_btnTwo.insets = new Insets(0, 0, 0, 5);
-		gbc_btnTwo.gridx = 1;
-		gbc_btnTwo.gridy = 0;
-		panelForButtons.add(btnTwo, gbc_btnTwo);
-		btnTwo.setBorder(new SoftBevelBorder(BevelBorder.LOWERED, null, null, null, null));
-		btnTwo.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				doBtnTwo();
-			}
-		});
-		btnTwo.setPreferredSize(new Dimension(100, 20));
-		btnTwo.setMaximumSize(new Dimension(0, 0));
+		btnFileSaveAs = new JButton("Save as...");
+		btnFileSaveAs.setName(BTN_FILE_SAVE_AS);
+		btnFileSaveAs.addActionListener(applicationAdapter);
+		btnFileSaveAs.setMinimumSize(new Dimension(100, 20));
+		GridBagConstraints gbc_btnFileSaveAs = new GridBagConstraints();
+		gbc_btnFileSaveAs.insets = new Insets(0, 0, 0, 5);
+		gbc_btnFileSaveAs.gridx = 1;
+		gbc_btnFileSaveAs.gridy = 0;
+		panelForButtons.add(btnFileSaveAs, gbc_btnFileSaveAs);
+		btnFileSaveAs.setBorder(new SoftBevelBorder(BevelBorder.LOWERED, null, null, null, null));
+		btnFileSaveAs.setPreferredSize(new Dimension(100, 20));
+		btnFileSaveAs.setMaximumSize(new Dimension(0, 0));
 
-		btnThree = new JButton("Button 3");
-		btnThree.setMinimumSize(new Dimension(100, 20));
-		GridBagConstraints gbc_btnThree = new GridBagConstraints();
-		gbc_btnThree.insets = new Insets(0, 0, 0, 5);
-		gbc_btnThree.gridx = 3;
-		gbc_btnThree.gridy = 0;
-		panelForButtons.add(btnThree, gbc_btnThree);
-		btnThree.setBorder(new SoftBevelBorder(BevelBorder.LOWERED, null, null, null, null));
-		btnThree.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				doBtnThree();
-			}
-		});
-		btnThree.setPreferredSize(new Dimension(100, 20));
-		btnThree.setMaximumSize(new Dimension(0, 0));
-
-		btnFour = new JButton("Button 4");
-		btnFour.setMinimumSize(new Dimension(100, 20));
-		GridBagConstraints gbc_btnFour = new GridBagConstraints();
-		gbc_btnFour.gridx = 4;
-		gbc_btnFour.gridy = 0;
-		panelForButtons.add(btnFour, gbc_btnFour);
-		btnFour.setBorder(new SoftBevelBorder(BevelBorder.LOWERED, null, null, null, null));
-		btnFour.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				doBtnFour();
-			}
-		});
-		btnFour.setPreferredSize(new Dimension(100, 20));
-		btnFour.setMaximumSize(new Dimension(0, 0));
+		btnFileExit = new JButton("Exit");
+		btnFileExit.setName(BTN_FILE_EXIT);
+		btnFileExit.addActionListener(applicationAdapter);
+		btnFileExit.setMinimumSize(new Dimension(100, 20));
+		GridBagConstraints gbc_btnFileExit = new GridBagConstraints();
+		gbc_btnFileExit.insets = new Insets(0, 0, 0, 5);
+		gbc_btnFileExit.gridx = 3;
+		gbc_btnFileExit.gridy = 0;
+		panelForButtons.add(btnFileExit, gbc_btnFileExit);
+		btnFileExit.setBorder(new SoftBevelBorder(BevelBorder.LOWERED, null, null, null, null));
+		btnFileExit.setPreferredSize(new Dimension(100, 20));
+		btnFileExit.setMaximumSize(new Dimension(0, 0));
 
 		splitPane1Main = new JSplitPane();
 		splitPane1Main.setOneTouchExpandable(true);
@@ -724,6 +792,7 @@ public class MakeZ80Source {
 		panelMain.setLayout(gbl_panelMain);
 
 		splitPaneCode = new JSplitPane();
+		splitPaneCode.setResizeWeight(0.5);
 		splitPaneCode.setOrientation(JSplitPane.VERTICAL_SPLIT);
 		splitPaneCode.setOneTouchExpandable(true);
 		GridBagConstraints gbc_splitPaneCode = new GridBagConstraints();
@@ -755,11 +824,6 @@ public class MakeZ80Source {
 		sbarZilog = scrollPaneZilog.getVerticalScrollBar();
 		sbarZilog.addAdjustmentListener(applicationAdapter);
 		scrollPaneZilog.setViewportView(textZilog);
-
-		lblZilogFile = new JLabel(NO_FILE);
-		lblZilogFile.setHorizontalAlignment(SwingConstants.CENTER);
-		lblZilogFile.setFont(new Font("Trebuchet MS", Font.BOLD, 14));
-		scrollPaneZilog.setColumnHeaderView(lblZilogFile);
 
 		txtLog = new JTextPane();
 		scrollPaneForLog.setViewportView(txtLog);
@@ -801,20 +865,20 @@ public class MakeZ80Source {
 		JMenu mnuFile = new JMenu("File");
 		menuBar.add(mnuFile);
 
-		JMenuItem mnuFileOpen = new JMenuItem("Open...");
-		mnuFileOpen.setName(MNU_FILE_OPEN);
-		mnuFileOpen.addActionListener(applicationAdapter);
-		mnuFile.add(mnuFileOpen);
+		mnuFileLoad = new JMenuItem("Load Intel File ...");
+		mnuFileLoad.setName(MNU_FILE_LOAD);
+		mnuFileLoad.addActionListener(applicationAdapter);
+		mnuFile.add(mnuFileLoad);
 
 		JSeparator separator99 = new JSeparator();
 		mnuFile.add(separator99);
 
-		JMenuItem mnuFileSave = new JMenuItem("Save...");
-		mnuFileSave.setName(MNU_FILE_SAVE);
-		mnuFileSave.addActionListener(applicationAdapter);
-		mnuFile.add(mnuFileSave);
+		// mnuFileSave = new JMenuItem("Save...");
+		// mnuFileSave.setName(MNU_FILE_SAVE);
+		// mnuFileSave.addActionListener(applicationAdapter);
+		// mnuFile.add(mnuFileSave);
 
-		JMenuItem mnuFileSaveAs = new JMenuItem("Save As...");
+		mnuFileSaveAs = new JMenuItem("Save As...");
 		mnuFileSaveAs.setName(MNU_FILE_SAVE_AS);
 		mnuFileSaveAs.addActionListener(applicationAdapter);
 		mnuFile.add(mnuFileSaveAs);
@@ -822,7 +886,7 @@ public class MakeZ80Source {
 		JSeparator separator_2 = new JSeparator();
 		mnuFile.add(separator_2);
 
-		JMenuItem mnuFileExit = new JMenuItem("Exit");
+		mnuFileExit = new JMenuItem("Exit");
 		mnuFileExit.setName(MNU_FILE_EXIT);
 		mnuFileExit.addActionListener(applicationAdapter);
 		mnuFile.add(mnuFileExit);
@@ -832,17 +896,22 @@ public class MakeZ80Source {
 	private static final String PUM_LOG_PRINT = "popupLogPrint";
 	private static final String PUM_LOG_CLEAR = "popupLogClear";
 
-	private static final String SOURCE_BASE = "C:\\Users\\admin\\Dropbox\\Resources\\CPM\\CurrentOS\\";
-	private static final String SOURCE_8080 = SOURCE_BASE + "8080";
-	private static final String SOURCE_Z80 = SOURCE_BASE + "Z80";
+	private static final String INTEL_BASE = "C:\\Users\\admin\\Dropbox\\Resources\\CPM\\CurrentOS\\8080";
+	private static final String ZILOG_BASE = "C:\\Users\\admin\\Dropbox\\Resources\\CPM\\CurrentOS\\Z80";
+	// private static final String INTEL_8080 = INTEL_BASE + "";
+	// private static final String SOURCE_Z80 = INTEL_BASE + "";
 
 	static final String EMPTY_STRING = "";
 	static final String NO_FILE = "<<No File>>";
 
-	private static final String MNU_FILE_OPEN = "mnuFileOpen";
+	private static final String MNU_FILE_LOAD = "mnuFileOpen";
 	private static final String MNU_FILE_SAVE = "mnuFileSave";
 	private static final String MNU_FILE_SAVE_AS = "mnuFileSaveAs";
 	private static final String MNU_FILE_EXIT = "mnuFileExit";
+
+	private static final String BTN_FILE_LOAD = "btnFileLoad";
+	private static final String BTN_FILE_SAVE_AS = "btnFileSaveAs";
+	private static final String BTN_FILE_EXIT = "btnFileExit";
 
 	//////////////////////////////////////////////////////////////////////////
 	class ApplicationAdapter implements ActionListener, AdjustmentListener {
@@ -862,13 +931,12 @@ public class MakeZ80Source {
 		public void actionPerformed(ActionEvent actionEvent) {
 			String name = ((Component) actionEvent.getSource()).getName();
 			switch (name) {
-			case MNU_FILE_OPEN:
+			case MNU_FILE_LOAD:
+			case BTN_FILE_LOAD:
 				doFileOpen();
 				break;
-			case MNU_FILE_SAVE:
-				doFileSave();
-				break;
 			case MNU_FILE_SAVE_AS:
+			case BTN_FILE_SAVE_AS:
 				doFileSaveAs();
 				break;
 			case MNU_FILE_EXIT:
@@ -919,10 +987,9 @@ public class MakeZ80Source {
 	}// addPopup
 
 	private JFrame frmTemplate;
-	private JButton btnOne;
-	private JButton btnTwo;
-	private JButton btnThree;
-	private JButton btnFour;
+	private JButton btnLoadIntelFile;
+	private JButton btnFileSaveAs;
+	private JButton btnFileExit;
 	private JSplitPane splitPane1Main;
 	private JSplitPane splitPaneCode;
 
@@ -931,7 +998,6 @@ public class MakeZ80Source {
 	private JTextPane textIntel;
 	private JTextPane textZilog;
 	private JLabel lblIntelFile;
-	private JLabel lblZilogFile;
 
 	private SimpleAttributeSet attrBlack = new SimpleAttributeSet();
 	private SimpleAttributeSet attrBlue = new SimpleAttributeSet();
@@ -942,5 +1008,9 @@ public class MakeZ80Source {
 	private SimpleAttributeSet attrNavy = new SimpleAttributeSet();
 	private SimpleAttributeSet attrMaroon = new SimpleAttributeSet();
 	private SimpleAttributeSet attrTeal = new SimpleAttributeSet();
+	private JMenuItem mnuFileLoad;
+	private JMenuItem mnuFileSave;
+	private JMenuItem mnuFileSaveAs;
+	private JMenuItem mnuFileExit;
 
 }// class GUItemplate

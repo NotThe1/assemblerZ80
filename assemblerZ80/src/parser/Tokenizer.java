@@ -73,7 +73,8 @@ public class Tokenizer {
 
 	}// class TokenInfo PARENTHeSIS
 	
-	private static final String PATTERN_FUNCTION = "(?i)sin|cos|exp|ln|sqrt";
+	private static final String PATTERN_FUNCTION = "(?i)(sin|cos|exp|ln|sqrt)(?=\\()";
+//	private static final String PATTERN_FUNCTION = "(?i)sin|cos|exp|ln|sqrt";
 	private static final String PATTERN_OPEN_PARENTHESES = "\\(";
 	private static final String PATTERN_CLOSE_PARENTHESES = "\\)";
 	private static final String PATTERN_PLUS_MINUS = "[\\+|-]";

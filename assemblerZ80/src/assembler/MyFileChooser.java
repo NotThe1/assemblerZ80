@@ -9,7 +9,7 @@ public class MyFileChooser {
 		// TODO Auto-generated constructor stub
 	}// Constructor
 	
-	public static JFileChooser getFilePicker(String directory, String filterDescription, String filterExtensions) {
+	public static JFileChooser getFilePicker(String directory, String filterDescription, String... filterExtensions) {
 		JFileChooser chooser = new JFileChooser(directory);
 		chooser.setMultiSelectionEnabled(false);
 		chooser.addChoosableFileFilter(new FileNameExtensionFilter(filterDescription, filterExtensions));

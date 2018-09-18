@@ -1115,8 +1115,8 @@ public class ASM {// implements Observer
 			fileReference = parentDirectory + System.getProperty("file.separator") + fileReference;
 		} //
 
-		if (!(fileReference.toUpperCase().endsWith(SUFFIX_ASSEMBLER.toUpperCase()))) {
-			fileReference += "." + SUFFIX_ASSEMBLER;
+		if (!(fileReference.toUpperCase().endsWith(SUFFIX_ASSEMBLER_Z80.toUpperCase()))) {
+			fileReference += "." + SUFFIX_ASSEMBLER_Z80;
 		} //
 
 		String includeMarker = ";<<<<<<<<<<<<<<<<<<<<<<< Include >>>>>>>>>>>>>>>>";
@@ -1151,7 +1151,7 @@ public class ASM {// implements Observer
 
 	private void openFile() {
 		JFileChooser chooserOpen = MyFileChooser.getFilePicker(defaultDirectory, "Assembler Source Code",
-				SUFFIX_ASSEMBLER);
+				SUFFIX_ASSEMBLER_8080,SUFFIX_ASSEMBLER_Z80);
 		if (chooserOpen.showOpenDialog(null) != JFileChooser.APPROVE_OPTION) {
 			System.out.printf("%s%n", "You cancelled the file open");
 		} else {
@@ -1541,6 +1541,7 @@ public class ASM {// implements Observer
 		panelLeft.add(btnLoadLastFile, gbc_btnLoadLastFile);
 
 		splitPane = new JSplitPane();
+		splitPane.setOrientation(JSplitPane.VERTICAL_SPLIT);
 		splitPane.setDividerSize(8);
 		splitPane.setOneTouchExpandable(true);
 		GridBagConstraints gbc_splitPane = new GridBagConstraints();
@@ -1643,7 +1644,7 @@ public class ASM {// implements Observer
 				openFile();
 				break;
 			case MNU_FILE_PRINT_SOURCE:
-				printListing(tpSource, sourceFileBase + DOT + SUFFIX_ASSEMBLER);
+				printListing(tpSource, sourceFileBase + DOT + SUFFIX_ASSEMBLER_8080);
 				break;
 			case MNU_FILE_PRINT_LISTING:
 				printListing(tpListing, sourceFileBase + DOT + SUFFIX_LISTING);
@@ -1709,7 +1710,8 @@ public class ASM {// implements Observer
 	private static final String FILE_SEPARATOR = File.separator;
 	private static final String DEFAULT_DIRECTORY = "." + FILE_SEPARATOR + "Code" + FILE_SEPARATOR + ".";
 
-	private final static String SUFFIX_ASSEMBLER = "asm";
+	private final static String SUFFIX_ASSEMBLER_8080 = "asm";
+	private final static String SUFFIX_ASSEMBLER_Z80 = "z80";
 	private final static String SUFFIX_LISTING = "list";
 	private final static String SUFFIX_RTF = "rtf";
 	private final static String SUFFIX_MEM = "mem";

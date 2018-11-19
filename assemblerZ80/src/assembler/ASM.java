@@ -1,5 +1,7 @@
 package assembler;
-
+/*
+ *   2018-11-19  aet rev at 2.0
+ */
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
@@ -1422,7 +1424,7 @@ public class ASM {// implements Observer
 				appClose();
 			}
 		});
-		frmAsmAssembler.setTitle("ASM - assembler for Zilog Z80");
+		frmAsmAssembler.setTitle("ASM - assembler for Zilog Z80  2.0");
 		frmAsmAssembler.setBounds(100, 100, 662, 541);
 		frmAsmAssembler.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		GridBagLayout gridBagLayout = new GridBagLayout();

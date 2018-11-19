@@ -86,7 +86,7 @@ public class SymbolTable{
 	public List<String> getAllSymbols() {
 		Set<String> allSymbols = symbols.keySet();
 		List<String> symbolList = new ArrayList<String>(allSymbols);
-		Collections.sort(symbolList, new CaseInsensitiveSort());
+		Collections.sort(symbolList, new CaseInsensitiveSort<String>());
 		return symbolList;
 	}// getAllSymbols2
 	

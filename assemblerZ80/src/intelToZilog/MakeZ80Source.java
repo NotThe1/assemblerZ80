@@ -526,18 +526,18 @@ public class MakeZ80Source {
 
 	////////////////////////////////////////////////////////////////
 
-	private void doBtnOne() {
-		sbarIntel.setValue(0);
-		sbarZilog.setValue(0);
-	}// doBtnOne
-
-	private void doBtnTwo() {
-
-	}// doBtnTwo
-
-	private void doBtnThree() {
-
-	}// doBtnThree
+//	private void doBtnOne() {
+//		sbarIntel.setValue(0);
+//		sbarZilog.setValue(0);
+//	}// doBtnOne
+//
+//	private void doBtnTwo() {
+//
+//	}// doBtnTwo
+//
+//	private void doBtnThree() {
+//
+//	}// doBtnThree
 
 	private void doFileOpen() {
 		FileNameExtensionFilter filter = new FileNameExtensionFilter("Source Files", "asm", "z80");
@@ -914,7 +914,7 @@ public class MakeZ80Source {
 	static final String NO_FILE = "<<No File>>";
 
 	private static final String MNU_FILE_LOAD = "mnuFileOpen";
-	private static final String MNU_FILE_SAVE = "mnuFileSave";
+//	private static final String MNU_FILE_SAVE = "mnuFileSave";
 	private static final String MNU_FILE_SAVE_AS = "mnuFileSaveAs";
 	private static final String MNU_FILE_EXIT = "mnuFileExit";
 
@@ -1018,7 +1018,7 @@ public class MakeZ80Source {
 	private SimpleAttributeSet attrMaroon = new SimpleAttributeSet();
 	private SimpleAttributeSet attrTeal = new SimpleAttributeSet();
 	private JMenuItem mnuFileLoad;
-	private JMenuItem mnuFileSave;
+//	private JMenuItem mnuFileSave;
 	private JMenuItem mnuFileSaveAs;
 	private JMenuItem mnuFileExit;
 

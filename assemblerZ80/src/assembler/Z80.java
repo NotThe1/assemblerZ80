@@ -96,7 +96,11 @@ public final class Z80 {
 
 	public static final Pattern patEXP_IM = Pattern.compile("0|1|2");
 
-	public static final HashMap<String, Byte> conditionTable = new HashMap<>();
+	public static Byte getConditionByte(String condition) {
+		return conditionTable.get(condition);
+	}//getRegisterByte
+	
+	private static final HashMap<String, Byte> conditionTable = new HashMap<>();
 	static {
 		conditionTable.put("NZ", (byte) 0b00000000);
 		conditionTable.put("Z", (byte) 0b00001000);
@@ -108,7 +112,11 @@ public final class Z80 {
 		conditionTable.put("M", (byte) 0b00111000);
 	}// static conditionTable
 
-	public static final HashMap<String, Byte> registerTable = new HashMap<>();
+	public static Byte getRegisterByte(String register) {
+		return registerTable.get(register);
+	}//getRegisterByte
+	
+	private static final HashMap<String, Byte> registerTable = new HashMap<>();
 	static {
 		registerTable.put("A", (byte) 0b00000111);
 		registerTable.put("B", (byte) 0b00000000);

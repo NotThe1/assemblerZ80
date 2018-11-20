@@ -6,10 +6,9 @@ import java.util.regex.Pattern;
 public class SourceLineAnalyzer {
 
 	private SourceLineParts sourceLineParts;
-	private String originalLine;
+//	private String originalLine;
 	InstructionSet is = InstructionSet.getInstance();
-	Pattern patternForInstruction = is.getPatternInstructions();
-
+	Pattern patternForInstruction = InstructionSet.getPatternInstructions();
 	public SourceLineAnalyzer() {
 
 	}// Constructor
@@ -17,7 +16,7 @@ public class SourceLineAnalyzer {
 	public SourceLineParts analyze(String line) {
 		sourceLineParts = new SourceLineParts();
 		String workingLine = new String(line);
-		this.originalLine = new String(line);
+//		this.originalLine = new String(line);
 
 		if (workingLine.trim().length() == 0) {
 			return sourceLineParts;

@@ -118,10 +118,10 @@ public class HexFormatter implements IByteArrayToStringFormat {
 
 	private static final String START_CODE = ":"; // Colon
 	private static final int RT_DATA = 0; // Record type - Data
-	private static final int RT_EOF = 1; // Record type - End of File
-	private static final int RT_ESA = 2; // Record type - Extended Segment Address
-	private static final int RT_SSA = 3; // Record type - Start Segment Address
-	private static final int RT_ELA = 4; // Record type - Extended Linear Address
-	private static final int RT_SLA = 5; // Record type - Start Linear Address
+//	private static final int RT_EOF = 1; // Record type - End of File
+//	private static final int RT_ESA = 2; // Record type - Extended Segment Address
+//	private static final int RT_SSA = 3; // Record type - Start Segment Address
+//	private static final int RT_ELA = 4; // Record type - Extended Linear Address
+//	private static final int RT_SLA = 5; // Record type - Start Linear Address
 
 }// class HexFormatter

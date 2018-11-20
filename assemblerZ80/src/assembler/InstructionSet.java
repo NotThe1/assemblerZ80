@@ -27,8 +27,8 @@ public class InstructionSet {
 		return instructions.containsKey(opCode);
 	}// isValid
 
-	public Pattern getPatternInstructions() {
-		return this.patternInstructions;
+	public static Pattern getPatternInstructions() {
+		return patternInstructions;
 	}// getPatternInstructions
 
 //	public String getSubCode(String source) {

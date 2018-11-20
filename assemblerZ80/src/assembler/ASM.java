@@ -300,11 +300,11 @@ public class ASM {// implements Observer
 		case "ADC":
 		case "SBC":
 			if (si.argument1Type.equals(Z80.LIT_HL)) { // ADC_4
-				regByte = Z80.registerTable.get(argument2);
+				regByte = Z80.getRegisterByte(argument2);
 				ans[1] = (byte) (ans[1] | regByte);
 			} else {// arg1 is LIT_A
 				if (si.argument2Type.equals(Z80.R_MAIN)) { // ADC_2
-					regByte = Z80.registerTable.get(argument2);
+					regByte = Z80.getRegisterByte(argument2);
 					ans[0] = (byte) (ans[0] | regByte);
 				} else if (si.argument2Type.equals(Z80.IND_XYd)) { // ADC_1
 					if (argument2.startsWith("(IY")) {
@@ -322,17 +322,17 @@ public class ASM {// implements Observer
 
 		case "ADD":
 			if (si.argument1Type.equals(Z80.LIT_HL)) { // ADD_4
-				regByte = Z80.registerTable.get(argument2);
+				regByte = Z80.getRegisterByte(argument2);
 				ans[0] = (byte) (ans[0] | regByte);
 			} else if (si.argument2Type.equals(Z80.LIT_IXY)) {// ADD_5
 				if (argument1.equals("IY")) {
 					ans[0] = (byte) 0XFD;
 				} // else use the stored value for IX
-				regByte = Z80.registerTable.get(argument2);
+				regByte = Z80.getRegisterByte(argument2);
 				ans[1] = (byte) (ans[1] | regByte);
 			} else {// arg1 is LIT_A
 				if (si.argument2Type.equals(Z80.R_MAIN)) { // ADD_2
-					regByte = Z80.registerTable.get(argument2);
+					regByte = Z80.getRegisterByte(argument2);
 					ans[0] = (byte) (ans[0] | regByte);
 				} else if (si.argument2Type.equals(Z80.IND_XYd)) { // ADD_1
 					if (argument2.startsWith("(IY")) {
@@ -353,7 +353,7 @@ public class ASM {// implements Observer
 		case "SUB":
 		case "XOR":
 			if (si.argument1Type.equals(Z80.R_MAIN)) { // AND_2
-				regByte = Z80.registerTable.get(argument1);
+				regByte = Z80.getRegisterByte(argument1);
 				ans[0] = (byte) (ans[0] | regByte);
 			} else if (si.argument1Type.equals(Z80.IND_XYd)) { // AND_1
 				if (argument1.startsWith("(IY")) {
@@ -381,7 +381,7 @@ public class ASM {// implements Observer
 			if (si.argument2Type.equals(Z80.R_MAIN)) {// BIT_2
 				ans[1] = (byte) (ans[1] | (byte) bitValue);
 				value = resolveExpression(argument1, sourceLineParts.getLineNumber());
-				value = Z80.registerTable.get(argument2);
+				value = Z80.getRegisterByte(argument2);
 				ans[1] = (byte) (ans[1] | value);
 			} else {// //BIT_1 IND_XYd
 				ans[3] = (byte) (ans[3] | (byte) bitValue);
@@ -397,7 +397,7 @@ public class ASM {// implements Observer
 		case "CALL":
 			String target = argument1;
 			if (si.argument1Type.equals(Z80.COND)) {// CALL_1
-				byte c = Z80.conditionTable.get(argument1);
+				byte c = Z80.getConditionByte(argument1);
 				ans[0] = (byte) (ans[0] | c);
 				target = argument2;
 			} // if conditions
@@ -419,7 +419,7 @@ public class ASM {// implements Observer
 					ans[0] = (byte) 0XFD;
 				} // else use the stored value for IX
 			} else if (si.argument1Type.equals(Z80.R_MAIN)) {// DEC_2
-				regByte = Z80.registerTable.get(argument1);
+				regByte = Z80.getRegisterByte(argument1);
 				ans[0] = (byte) (ans[0] | regByte);
 			} else {// DEC_4
 				ans[0] = (byte) (ans[0] | getRegLeft3(argument1));
@@ -473,7 +473,7 @@ public class ASM {// implements Observer
 					ans[0] = (byte) 0XFD;
 				} // else use the stored value for IX
 			} else if (si.argument1Type.equals(Z80.COND)) {// JP_1
-				regByte = Z80.conditionTable.get(argument1);
+				regByte = Z80.getConditionByte(argument1);
 				ans[0] = (byte) (ans[0] | regByte);
 				ans = resolveDW(ans, argument2, sourceLineParts.getLineNumber());
 			} else {// JP_4
@@ -484,7 +484,7 @@ public class ASM {// implements Observer
 		case "JR":
 			String relExpression = argument1;
 			if (si.argument1Type.equals(Z80.COND_LIMITED)) {// JR_1
-				regByte = Z80.conditionTable.get(argument1);
+				regByte = Z80.getConditionByte(argument1);
 				ans[0] = (byte) (ans[0] | regByte);
 				relExpression = argument2;
 			} // if
@@ -514,7 +514,7 @@ public class ASM {// implements Observer
 						ans[1] = (byte) 0X5F;
 					} // if
 				} else if (si.argument2Type.equals(Z80.R_MAIN)) { // LD_4
-					regByte = Z80.registerTable.get(argument2);
+					regByte = Z80.getRegisterByte(argument2);
 					ans[0] = (byte) (ans[0] | regByte);
 				} else if (si.argument2Type.equals(Z80.EXP_ADDR)) { // LD_5
 					ans = resolveDW(ans, argument2, sourceLineParts.getLineNumber());
@@ -555,7 +555,7 @@ public class ASM {// implements Observer
 				value = resolveExpression(exp, sourceLineParts.getLineNumber());
 				ans[2] = (byte) (ans[2] | (byte) value);
 				if (si.argument2Type.equals(Z80.R_MAIN)) {// LD_13
-					regByte = Z80.registerTable.get(argument2);
+					regByte = Z80.getRegisterByte(argument2);
 					ans[1] = (byte) (ans[1] | regByte);
 				} else { // LD_14 expression
 					value = resolveExpression(argument2, sourceLineParts.getLineNumber());
@@ -571,7 +571,7 @@ public class ASM {// implements Observer
 
 			case Z80.R16_BDH: // LD_16, LD_17
 				ans = resolveDW(ans, argument2, sourceLineParts.getLineNumber());
-				regByte = Z80.registerTable.get(argument1);
+				regByte = Z80.getRegisterByte(argument1);
 
 				if (si.argument2Type.equals(Z80.EXP_ADDR)) {// LD_16
 					ans[1] = (byte) (ans[1] | (byte) regByte);
@@ -585,13 +585,13 @@ public class ASM {// implements Observer
 					ans[0] = (byte) 0XFD;
 				} // else use the stored value for IX
 				ans = resolveDW(ans, argument2, sourceLineParts.getLineNumber());
-				regByte = Z80.registerTable.get(argument1);
+				regByte = Z80.getRegisterByte(argument1);
 				break;
 
 			case Z80.R81: // LD_20, LD_21,LD_22
 				if (si.argument2Type.equals(Z80.R_MAIN)) {// LD_20
 					ans[0] = (byte) (ans[0] | getRegLeft3(argument1));
-					regByte = Z80.registerTable.get(argument2);
+					regByte = Z80.getRegisterByte(argument2);
 					ans[0] = (byte) (ans[0] | regByte);
 				} else if (si.argument2Type.equals(Z80.IND_XYd)) { // LD_21
 					ans[1] = (byte) (ans[1] | getRegLeft3(argument1));
@@ -610,7 +610,7 @@ public class ASM {// implements Observer
 
 			case Z80.IND_HL: // LD_23, LD_24
 				if (si.argument2Type.equals(Z80.R_MAIN)) {
-					regByte = Z80.registerTable.get(argument2);
+					regByte = Z80.getRegisterByte(argument2);
 					ans[0] = (byte) (ans[0] | regByte);
 				} else { // Expression
 					value = resolveExpression(argument2, sourceLineParts.getLineNumber());
@@ -623,7 +623,7 @@ public class ASM {// implements Observer
 					ans[0] = (byte) 0XFD;
 				} // else use the stored value for IX
 				if (si.argument2Type.equals(Z80.R16_SP)) { // LD_28
-					regByte = Z80.registerTable.get(argument2);
+					regByte = Z80.getRegisterByte(argument2);
 					ans[1] = (byte) (ans[1] | regByte);
 				} // if
 					// rest need ony identify the address
@@ -655,7 +655,7 @@ public class ASM {// implements Observer
 					ans[0] = (byte) 0XFD;
 				} // else use the stored value for IX
 			} else {// PUSH_2,POP_2
-				regByte = Z80.registerTable.get(argument1);
+				regByte = Z80.getRegisterByte(argument1);
 				ans[0] = (byte) (ans[0] | regByte);
 			} // if
 			break;
@@ -673,7 +673,7 @@ public class ASM {// implements Observer
 
 			if (si.argument2Type.equals(Z80.R_MAIN)) { // RES_1
 				ans[1] = (byte) (ans[1] | (byte) bitValue);
-				regByte = Z80.registerTable.get(argument2);
+				regByte = Z80.getRegisterByte(argument2);
 				ans[1] = (byte) (ans[1] | regByte);
 
 			} else { // RES_2
@@ -691,7 +691,7 @@ public class ASM {// implements Observer
 
 		case "RET":
 			if (si.argument1Type != null) {// RET_1
-				byte c = Z80.conditionTable.get(argument1);
+				byte c = Z80.getConditionByte(argument1);
 				ans[0] = (byte) (ans[0] | c);
 			} // if - do nothing if RET_2
 			break;
@@ -711,7 +711,7 @@ public class ASM {// implements Observer
 				value = resolveExpression(exp, sourceLineParts.getLineNumber());
 				ans[2] = (byte) (ans[2] | (byte) value);
 			} else { // RL_2
-				regByte = Z80.registerTable.get(argument1);
+				regByte = Z80.getRegisterByte(argument1);
 				ans[1] = (byte) (ans[1] | regByte);
 			} // if
 			break;
@@ -734,7 +734,7 @@ public class ASM {// implements Observer
 	}// getActualCodes
 
 	private byte getRegLeft3(String arg) {
-		byte regValue = Z80.registerTable.get(arg);
+		byte regValue = Z80.getRegisterByte(arg);
 		return (byte) (regValue << 3);
 	}// getRegLeft3
 
@@ -1727,24 +1727,24 @@ public class ASM {// implements Observer
 	private static final String SBAR_SOURCE = "sbarSource";
 	private static final String SBAR_LISTING = "sbarListing";
 
-	private static final String LINE_SEPARATOR = System.lineSeparator();
+//	private static final String LINE_SEPARATOR = System.lineSeparator();
 	private static final String FILE_SEPARATOR = File.separator;
 	private static final String DEFAULT_DIRECTORY = "." + FILE_SEPARATOR + "Code" + FILE_SEPARATOR + ".";
 
 	private final static String SUFFIX_ASSEMBLER_8080 = "asm";
 	private final static String SUFFIX_ASSEMBLER_Z80 = "z80";
 	private final static String SUFFIX_LISTING = "list";
-	private final static String SUFFIX_RTF = "rtf";
+//	private final static String SUFFIX_RTF = "rtf";
 	private final static String SUFFIX_MEM = "mem";
 	private final static String SUFFIX_HEX = "hex";
 
 	private static final String EMPTY_STRING = ""; // empty string
-	private static final String ERRORS = "There are assembly errors"; // error message
-	private static final String SPACE = " "; // Space 0X20
+//	private static final String ERRORS = "There are assembly errors"; // error message
+//	private static final String SPACE = " "; // Space 0X20
 	private static final String COMMA = ","; // Comma ,
-	private static final String COLON = ":"; // Colon : ,
+//	private static final String COLON = ":"; // Colon : ,
 	private static final String QUOTE = "'"; // single quote '
-	private static final String PERIOD = "."; // period .
+//	private static final String PERIOD = "."; // period .
 	private static final String DOT = "."; // period .
 
 	private static final String hexValuePattern = "[0-9][0-9A-Fa-f]{0,4}H";
@@ -1753,7 +1753,7 @@ public class ASM {// implements Observer
 	private static final String decimalValuePattern = "[0-9]{1,4}D?+";
 	private static final String stringValuePattern = "\\A'.*'\\z"; // used for
 
-	private static final int SIXTEEN = 16; // 0X10
+//	private static final int SIXTEEN = 16; // 0X10
 
 	private SimpleAttributeSet attrBlack = new SimpleAttributeSet();
 	private SimpleAttributeSet attrBlue = new SimpleAttributeSet();

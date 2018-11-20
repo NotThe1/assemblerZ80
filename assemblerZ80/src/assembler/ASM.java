@@ -1,6 +1,8 @@
 package assembler;
+
 /*
- *   2018-11-19  aet rev at 2.0
+ *   2018-11-20  Fixed problem with resolving Relative Jumps - FM
+ *   2018-11-19  set rev at 2.0
  */
 import java.awt.Color;
 import java.awt.Component;
@@ -195,7 +197,7 @@ public class ASM {// implements Observer
 					} else {
 						hexNumber = line.substring(1, 3);
 						dataCount = Integer.valueOf(hexNumber, 16);
-						dataCount = (dataCount * 2) +2; // add in data type
+						dataCount = (dataCount * 2) + 2; // add in data type
 						// patternEmpty = Pattern.compile("{i}:" + hexNumber + "[0-9A-F]{4}[0]{" + dataCount +"}");
 						patternEmpty = Pattern.compile(":" + hexNumber + "[0-9A-F]{4}[0]{" + dataCount + "}");
 						matcherEmpty = patternEmpty.matcher(line);
@@ -988,6 +990,10 @@ public class ASM {// implements Observer
 		String errorMsg = String.format("Directive %s on line: %04d not yet implemented", directive, lineNumber);
 		Scanner scannerComma;
 		switch (directive.toUpperCase()) {
+		// case "EQU":
+		// int value = resolveSimpleArgument(arguments,lineNumber);
+		// symbolTable.defineSymbol(slp.getName(), value, lineNumber, SymbolTable.NAME);
+		// break;
 		case "DB":
 			if (arguments != null) {
 				String arg;
@@ -1070,7 +1076,8 @@ public class ASM {// implements Observer
 			reportError(errorMsg);
 			break;
 		default:
-			// ignore
+			// NOP
+			break;
 		}// switch directive
 
 	}// processDirectiveForLineCounter
@@ -1153,7 +1160,7 @@ public class ASM {// implements Observer
 
 	private void openFile() {
 		JFileChooser chooserOpen = MyFileChooser.getFilePicker(defaultDirectory, "Assembler Source Code",
-				SUFFIX_ASSEMBLER_8080,SUFFIX_ASSEMBLER_Z80);
+				SUFFIX_ASSEMBLER_8080, SUFFIX_ASSEMBLER_Z80);
 		if (chooserOpen.showOpenDialog(null) != JFileChooser.APPROVE_OPTION) {
 			System.out.printf("%s%n", "You cancelled the file open");
 		} else {
@@ -1273,11 +1280,23 @@ public class ASM {// implements Observer
 	private Integer resolveRelativeValue(String argument, Integer lineNumber) {
 		Integer ans = null;
 
-		if (symbolTable.contains(argument) && symbolTable.getType(argument) == SymbolTable.LABEL) {
+		int targetType = symbolTable.getType(argument);
+		if (symbolTable.contains(argument)&&(targetType == SymbolTable.LABEL||targetType == SymbolTable.NAME)) {
+			
+//		}//if argument in symbol table
+//		if (symbolTable.contains(argument) && symbolTable.getType(argument) == SymbolTable.LABEL) {
 			int nextInstructionLocation = symbolTable.getValue("$") + 2;
 			int symbolValue = symbolTable.getValue(argument);
-			symbolTable.referenceSymbol(argument, lineNumber);
 			ans = symbolValue - nextInstructionLocation;
+			if((ans <-124)|(ans>131)) {
+				String msg = String.format("[ASM.resolveRelativeValue] Argument out of range %s %x%n", argument,symbolValue);
+				reportError(msg);
+				ans = 0;
+			}//if
+			
+			
+			symbolTable.referenceSymbol(argument, lineNumber);
+//			ans = symbolValue - nextInstructionLocation;
 		} else {
 			ans = resolveExpression(argument, lineNumber);
 		}
@@ -1424,7 +1443,7 @@ public class ASM {// implements Observer
 				appClose();
 			}
 		});
-		frmAsmAssembler.setTitle("ASM - assembler for Zilog Z80  2.0");
+		frmAsmAssembler.setTitle("ASM - assembler for Zilog Z80  2.0.1");
 		frmAsmAssembler.setBounds(100, 100, 662, 541);
 		frmAsmAssembler.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		GridBagLayout gridBagLayout = new GridBagLayout();

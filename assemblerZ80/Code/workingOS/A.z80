@@ -1,5 +1,6 @@
-LD     A,sin(5)
-LD     A,(sinccccc)
-HALT
-sinccccc:   DB     00H
-;End
+TBA	EQU	0100H
+Start:
+       JR	TBA
+	   JR	TBA1
+	   DS	0FEh
+TBA1:

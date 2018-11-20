@@ -1,7 +1,7 @@
 0001: 0000         ;     File created by MakeZ80Source on Tue Sep 18 10:06:02 EDT 2018 from:
 0002: 0000         ;     C:\Users\admin\Dropbox\Resources\CPM\CurrentOS\8080\ROM.asm
-0003: 0000         ; ROM.asm
-0004: 0000         ; Rom for bios set up for diskA to be 3.5HD (1.44MB) disk
+0003: 0000         ; ROM.Z80
+0004: 0000         ; Rom for BIOS set up for diskA to be 3.5HD (1.44MB) disk
 0005: 0000
 0006: 0000         ; 2017-03-02 Refactored the CP/M Suite
 0007: 0000
@@ -197,7 +197,7 @@
 0197: 0000                        ORG    0000
 0198: 0000
 0199: 0000             CodeStart:
-0200: 0000 21 19 00               LD     HL,ROMControl
+0200: 0000 21 17 00               LD     HL,ROMControl
 0201: 0003 22 46 00               LD     (DiskCommandBlock),HL ; put it into the Command block for drive A:
 0202: 0006
 0203: 0006
@@ -207,28 +207,28 @@
 0207: 000B             WaitForBootComplete:
 0208: 000B 7E                     LD     A,(HL)               ; Get the control byte
 0209: 000C B7                     OR     A                    ; is it set to 0 (Completed operation) ?
-0210: 000D C2 0B 00               JP     NZ,WaitForBootComplete ; if not try again
-0211: 0010
-0212: 0010 3A 43 00               LD     A,(DiskStatusLocation) ; after operation what's the status?
-0213: 0013 FE 80                  CP     080H                 ; any errors ?
-0214: 0015
-0215: 0015 D2 00 01               JP     NC,TPA               ; now execute the boot loader
-0216: 0018 76                     HALT
-0217: 0019         ;---------------------------------------
-0218: 0019             ROMControl:
-0219: 0019 01                     DB     DiskReadCode         ; Read function
-0220: 001A 00                     DB     00H                  ; unit number
-0221: 001B 00                     DB     00H                  ; head number
-0222: 001C 00                     DB     00H                  ; track number
-0223: 001D 01                     DB     01H                  ; Starting sector number ()
-0224: 001E 00 02                  DW     diskSectorSize       ; Number of bytes to read ( 1 Sector)
-0225: 0020 00 01                  DW     TPA                  ; read into this address
-0226: 0022 43 00                  DW     DiskStatusLocation   ; pointer to next block - no linking
-0227: 0024 40 00                  DW     DiskControlTable     ; pointer to next table- no linking
-0228: 0026             CodeEnd:
-0229: 0026
+0210: 000D 20 FC                  JR     NZ,WaitForBootComplete ; if not try again
+0211: 000F
+0212: 000F 3A 43 00               LD     A,(DiskStatusLocation) ; after operation what's the status?
+0213: 0012 FE 80                  CP     080H                 ; any errors ?
+0214: 0014
+0215: 0014 30 00                  JR     NC,TPA               ; now execute the boot loader
+0216: 0016 76                     HALT
+0217: 0017         ;---------------------------------------
+0218: 0017             ROMControl:
+0219: 0017 01                     DB     DiskReadCode         ; Read function
+0220: 0018 00                     DB     00H                  ; unit number
+0221: 0019 00                     DB     00H                  ; head number
+0222: 001A 00                     DB     00H                  ; track number
+0223: 001B 01                     DB     01H                  ; Starting sector number ()
+0224: 001C 00 02                  DW     diskSectorSize       ; Number of bytes to read ( 1 Sector)
+0225: 001E 00 01                  DW     TPA                  ; read into this address
+0226: 0020 43 00                  DW     DiskStatusLocation   ; pointer to next block - no linking
+0227: 0022 40 00                  DW     DiskControlTable     ; pointer to next table- no linking
+0228: 0024             CodeEnd:
+0229: 0024
            ************************   Xref   ************************
-0000: $               0024
+0000: $               0022
 0060: BDOSBase        E800   0061 0063
 0029: BDOSE           0005   0030
 0061: BDOSEntry       E806
@@ -240,7 +240,7 @@
 0160: BlockSize       0800   0182
 0058: CCPEntry        E000   0060 0064
 0049: CCPLength       0800   0053 0060 0064
-0228: CodeEnd         0026
+0228: CodeEnd         0024
 0199: CodeStart       0000
 0035: ComTail         0080   0036
 0037: ComTailChars    0082
@@ -308,7 +308,7 @@
 0162: RecordsPerBlock 0010
 0146: RecordsPerExtent 0080
 0139: recordsPerSector 0004   0162 0177
-0218: ROMControl      0019   0200
+0218: ROMControl      0017   0200
 0191: SectorMask      0003
 0156: SectorsPerBlock 0004   0160 0162 0165 0171 0191
 0166: SectorsPerCylinder 0024   0169 0170

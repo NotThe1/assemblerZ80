@@ -1,7 +1,7 @@
 ;     File created by MakeZ80Source on Tue Sep 18 10:06:02 EDT 2018 from:
 ;     C:\Users\admin\Dropbox\Resources\CPM\CurrentOS\8080\ROM.asm
- ; ROM.asm
- ; Rom for bios set up for diskA to be 3.5HD (1.44MB) disk
+ ; ROM.Z80
+ ; Rom for BIOS set up for diskA to be 3.5HD (1.44MB) disk
  
  ; 2017-03-02 Refactored the CP/M Suite
  
@@ -22,12 +22,12 @@
  WaitForBootComplete:
  	LD		A,(HL)								; Get the control byte
  	OR		A								; is it set to 0 (Completed operation) ?
- 	JP	NZ,WaitForBootComplete				; if not try again
+ 	JR	NZ,WaitForBootComplete				; if not try again
  
  	LD		A,(DiskStatusLocation)				; after operation what's the status?
  	CP		080H							; any errors ?
  
- 	JP	NC,TPA								; now execute the boot loader
+ 	JR	NC,TPA								; now execute the boot loader
  	HALT
  ;---------------------------------------
  ROMControl:

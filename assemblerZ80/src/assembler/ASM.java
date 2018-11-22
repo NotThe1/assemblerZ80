@@ -1,6 +1,8 @@
 package assembler;
 
+
 /*
+ *   2018-11-22  Fixed problem with non Terse MemFile 
  *   2018-11-20  Fixed problem with resolving Relative Jumps - FM
  *   2018-11-19  set rev at 2.0
  */
@@ -175,7 +177,7 @@ public class ASM {// implements Observer
 					line = memFormatter.getNext();
 
 					matcherEmpty = patternEmpty.matcher(line);
-					if (matcherEmpty.find() & rbTerse.isSelected()) {
+					if (matcherEmpty.find() && rbTerse.isSelected()) {
 						continue;
 					} // if
 					pwMemFile.print(line);
@@ -224,9 +226,10 @@ public class ASM {// implements Observer
 		// int hiAddress = ((((instructionCounter.getCurrentLocation() - 1) / SIXTEEN) + 2) * SIXTEEN) - 1;
 		int hiAddress = (instructionCounter.getCurrentLocation() - 1) | 0X0F;
 		ByteBuffer memoryImage = ByteBuffer.allocate(hiAddress + 1);
-
-		instructionCounter.reset();
-		// clearDoc(docListing);
+		
+		int lowestLocationSet = instructionCounter.getLowestLocationSet();
+		instructionCounter.reset(lowestLocationSet);
+		instructionCounter.setCurrentLocation(lowestLocationSet);
 		int currentLocation;
 		String instructionImage;
 		SourceLineParts sourceLineParts;
@@ -1281,22 +1284,22 @@ public class ASM {// implements Observer
 		Integer ans = null;
 
 		int targetType = symbolTable.getType(argument);
-		if (symbolTable.contains(argument)&&(targetType == SymbolTable.LABEL||targetType == SymbolTable.NAME)) {
-			
-//		}//if argument in symbol table
-//		if (symbolTable.contains(argument) && symbolTable.getType(argument) == SymbolTable.LABEL) {
+		if (symbolTable.contains(argument) && (targetType == SymbolTable.LABEL || targetType == SymbolTable.NAME)) {
+
+			// }//if argument in symbol table
+			// if (symbolTable.contains(argument) && symbolTable.getType(argument) == SymbolTable.LABEL) {
 			int nextInstructionLocation = symbolTable.getValue("$") + 2;
 			int symbolValue = symbolTable.getValue(argument);
 			ans = symbolValue - nextInstructionLocation;
-			if((ans <-124)|(ans>131)) {
-				String msg = String.format("[ASM.resolveRelativeValue] Argument out of range %s %x%n", argument,symbolValue);
+			if ((ans < -124) | (ans > 131)) {
+				String msg = String.format("[ASM.resolveRelativeValue] Argument out of range %s %x%n", argument,
+						symbolValue);
 				reportError(msg);
 				ans = 0;
-			}//if
-			
-			
+			} // if
+
 			symbolTable.referenceSymbol(argument, lineNumber);
-//			ans = symbolValue - nextInstructionLocation;
+			// ans = symbolValue - nextInstructionLocation;
 		} else {
 			ans = resolveExpression(argument, lineNumber);
 		}
@@ -1321,7 +1324,6 @@ public class ASM {// implements Observer
 			}
 			answer = expression.getValue();
 		} catch (ParserException pe) {
-			// System.err.println(pe.getMessage());
 			String msg = String.format(" Line %04d has a  bad argument: %s", lineNumber, arguments);
 			reportError(msg);
 		} catch (EvaluationException ee) {
@@ -1443,7 +1445,7 @@ public class ASM {// implements Observer
 				appClose();
 			}
 		});
-		frmAsmAssembler.setTitle("ASM - assembler for Zilog Z80  2.0.1");
+		frmAsmAssembler.setTitle("ASM - assembler for Zilog Z80  2.0.2");
 		frmAsmAssembler.setBounds(100, 100, 662, 541);
 		frmAsmAssembler.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		GridBagLayout gridBagLayout = new GridBagLayout();
@@ -1727,24 +1729,24 @@ public class ASM {// implements Observer
 	private static final String SBAR_SOURCE = "sbarSource";
 	private static final String SBAR_LISTING = "sbarListing";
 
-//	private static final String LINE_SEPARATOR = System.lineSeparator();
+	// private static final String LINE_SEPARATOR = System.lineSeparator();
 	private static final String FILE_SEPARATOR = File.separator;
 	private static final String DEFAULT_DIRECTORY = "." + FILE_SEPARATOR + "Code" + FILE_SEPARATOR + ".";
 
 	private final static String SUFFIX_ASSEMBLER_8080 = "asm";
 	private final static String SUFFIX_ASSEMBLER_Z80 = "z80";
 	private final static String SUFFIX_LISTING = "list";
-//	private final static String SUFFIX_RTF = "rtf";
+	// private final static String SUFFIX_RTF = "rtf";
 	private final static String SUFFIX_MEM = "mem";
 	private final static String SUFFIX_HEX = "hex";
 
 	private static final String EMPTY_STRING = ""; // empty string
-//	private static final String ERRORS = "There are assembly errors"; // error message
-//	private static final String SPACE = " "; // Space 0X20
+	// private static final String ERRORS = "There are assembly errors"; // error message
+	// private static final String SPACE = " "; // Space 0X20
 	private static final String COMMA = ","; // Comma ,
-//	private static final String COLON = ":"; // Colon : ,
+	// private static final String COLON = ":"; // Colon : ,
 	private static final String QUOTE = "'"; // single quote '
-//	private static final String PERIOD = "."; // period .
+	// private static final String PERIOD = "."; // period .
 	private static final String DOT = "."; // period .
 
 	private static final String hexValuePattern = "[0-9][0-9A-Fa-f]{0,4}H";
@@ -1753,7 +1755,7 @@ public class ASM {// implements Observer
 	private static final String decimalValuePattern = "[0-9]{1,4}D?+";
 	private static final String stringValuePattern = "\\A'.*'\\z"; // used for
 
-//	private static final int SIXTEEN = 16; // 0X10
+	// private static final int SIXTEEN = 16; // 0X10
 
 	private SimpleAttributeSet attrBlack = new SimpleAttributeSet();
 	private SimpleAttributeSet attrBlue = new SimpleAttributeSet();

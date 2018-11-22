@@ -1,9 +1,9 @@
 package assembler;
 
 public class InstructionCounter {
-	
+
 	private static InstructionCounter instance = new InstructionCounter();
-	
+
 	private AppLogger appLogger = AppLogger.getInstance();
 
 	int currentSegment;
@@ -11,12 +11,12 @@ public class InstructionCounter {
 	String[] allocationType = { NONE, null, null }; // ASEG,CSEG,DSEG
 	int[] location = { 0, 0, 0 }; // ASEG,CSEG,DSEG
 	int[] priorLocation = { 0, 0, 0 }; // ASEG,CSEG,DSEG - last value before change
-	
-	int lowestLocationSet = 0XFFFF;
-	
-	public static InstructionCounter getInstance(){
+
+	int lowestLocationSet = 0XFFFe;
+
+	public static InstructionCounter getInstance() {
 		return instance;
-	}//getInstance
+	}// getInstance
 
 	private InstructionCounter() {
 		makeCurrent(ASEG, NONE);
@@ -30,45 +30,50 @@ public class InstructionCounter {
 		currentSegment = segment;
 		if (currentSegment == ASEG) {
 			return;
-		}// ASEG
+		} // ASEG
 		if (this.allocationType[currentSegment] == null) { /* only set for the first declaration */
 			this.allocationType[currentSegment] = allocationType;
-		}// if - first declaration
+		} // if - first declaration
 
 		if (this.allocationType[currentSegment] == PAGE) { // adjust for PAGE
 			location[currentSegment] = (location[currentSegment] + 100) & 0XFF00;
-		}// if - Page start boundary
+		} // if - Page start boundary
 	}// makeCurrent(String segment)
-	
-	public void reset(){
-		this.makeCurrent(ASEG,NONE);
-		for (int i = 0; i < location.length;i++){
+
+	public void reset() {
+		reset(0XFFFF);
+	}// reset
+
+	public void reset(int lowestLocation) {
+		this.makeCurrent(ASEG, NONE);
+		for (int i = 0; i < location.length; i++) {
 			location[i] = 0;
 			priorLocation[i] = 0;
-		}//for - clear each segment location
-		lowestLocationSet = 0XFFFF;
-	}//reset
+		} // for - clear each segment location
+		lowestLocationSet = lowestLocation;
+	}// reset
+
 	public void setCurrentLocation(int loc) {
-		 location[currentSegment] = loc;
-		 lowestLocationSet = Math.min(loc, lowestLocationSet);
-//		 if (lowestLocationSet < 0XE800){
-//			 int a = 9;
-//		 }
+		location[currentSegment] = loc;
+		lowestLocationSet = Math.min(loc, lowestLocationSet);
 	}// getCurrentLocation
-	public void setPriorLocation(){
+
+	public void setPriorLocation() {
 		priorLocation[currentSegment] = location[currentSegment];
 	}//
+
 	public int getCurrentLocation() {
 		return location[currentSegment];
 	}// getCurrentLocation
+
 	public int getPriorLocation() {
 		return priorLocation[currentSegment];
 	}// getCurrentLocation
+
 	public int getLowestLocationSet() {
 		return lowestLocationSet;
 	}// getLowestLocationSet
 
-	
 	public int getCurrentSegment() {
 		return currentSegment;
 	}// getCurrentSegment
@@ -80,13 +85,11 @@ public class InstructionCounter {
 			int currentPage = currentLocation & 0xFF00;
 			int newPage = (currentLocation + amount) & 0XFF00;
 			if (currentPage != newPage) {
-				String errMessage = String.format(
-						"error in segemnt %s at location %04X",
-						segmentNames[currentSegment], currentLocation);
+				String errMessage = String.format("error in segemnt %s at location %04X", segmentNames[currentSegment],
+						currentLocation);
 				appLogger.addError(errMessage);
-//				System.err.println(errMessage);
-			}// if error!
-		}// if INPAGE
+			} // if error!
+		} // if INPAGE
 		lowestLocationSet = Math.min(location[currentSegment], lowestLocationSet);
 		location[currentSegment] += amount;
 
@@ -105,4 +108,3 @@ public class InstructionCounter {
 	public static final String INPAGE = "INPAGE";
 
 }// class InstuctionCounter
-

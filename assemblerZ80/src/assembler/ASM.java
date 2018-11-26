@@ -2,6 +2,7 @@ package assembler;
 
 
 /*
+ *   2018-11-23  Added saving Terse setting between sessions
  *   2018-11-22  Fixed problem with non Terse MemFile 
  *   2018-11-20  Fixed problem with resolving Relative Jumps - FM
  *   2018-11-19  set rev at 2.0
@@ -1387,6 +1388,7 @@ public class ASM {// implements Observer
 		myPrefs.putBoolean("rbListing", rbListing.isSelected());
 		myPrefs.putBoolean("rbMemFile", rbMemFile.isSelected());
 		myPrefs.putBoolean("rbHexFile", rbHexFile.isSelected());
+		myPrefs.putBoolean("rbTerse", rbTerse.isSelected());
 
 		myPrefs.put("defaultDirectory", defaultDirectory);
 		myPrefs.put("LastFile", sourceFileFullName);
@@ -1406,6 +1408,7 @@ public class ASM {// implements Observer
 		rbListing.setSelected(myPrefs.getBoolean("rbListing", true));
 		rbMemFile.setSelected(myPrefs.getBoolean("rbMemFile", true));
 		rbHexFile.setSelected(myPrefs.getBoolean("rbHexFile", true));
+		rbTerse.setSelected(myPrefs.getBoolean("rbTerse", true));
 		sourceFileFullName = myPrefs.get("LastFile", "");
 		myPrefs = null;
 
@@ -1445,7 +1448,7 @@ public class ASM {// implements Observer
 				appClose();
 			}
 		});
-		frmAsmAssembler.setTitle("ASM - assembler for Zilog Z80  2.0.2");
+		frmAsmAssembler.setTitle("ASM - assembler for Zilog Z80  2.0.4");
 		frmAsmAssembler.setBounds(100, 100, 662, 541);
 		frmAsmAssembler.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		GridBagLayout gridBagLayout = new GridBagLayout();

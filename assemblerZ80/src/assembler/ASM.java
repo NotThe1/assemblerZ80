@@ -1,7 +1,8 @@
 package assembler;
 
-
 /*
+ * 	 2018-12-04 Trapped Index Out Of Range Exception.
+ *				Set Parent for JOption Pane error report at end of assembly
  *   2018-11-23  Added saving Terse setting between sessions
  *   2018-11-22  Fixed problem with non Terse MemFile 
  *   2018-11-20  Fixed problem with resolving Relative Jumps - FM
@@ -122,7 +123,7 @@ public class ASM {// implements Observer
 		if (appLogger.getErrorCount() + appLogger.getWarningCount() != 0) {
 			String msg = String.format("There are %d Errors%n and %d Warnings%n", appLogger.getErrorCount(),
 					appLogger.getWarningCount());
-			JOptionPane.showMessageDialog(null, msg);
+			JOptionPane.showMessageDialog(frmAsmAssembler, msg);
 
 		}
 	}// start
@@ -227,7 +228,7 @@ public class ASM {// implements Observer
 		// int hiAddress = ((((instructionCounter.getCurrentLocation() - 1) / SIXTEEN) + 2) * SIXTEEN) - 1;
 		int hiAddress = (instructionCounter.getCurrentLocation() - 1) | 0X0F;
 		ByteBuffer memoryImage = ByteBuffer.allocate(hiAddress + 1);
-		
+
 		int lowestLocationSet = instructionCounter.getLowestLocationSet();
 		instructionCounter.reset(lowestLocationSet);
 		instructionCounter.setCurrentLocation(lowestLocationSet);
@@ -831,7 +832,13 @@ public class ASM {// implements Observer
 		String[] parts = lineImage.trim().split("\\s");
 		for (int i = 0; i < parts.length; i++) {
 			intValue = Integer.valueOf(parts[i], 16);
-			memoryImage0.put((Integer) pc + i, (byte) intValue);
+			try {
+				memoryImage0.put((Integer) pc + i, (byte) intValue);
+			} catch (IndexOutOfBoundsException obe) {
+				// System.err.printf("[ASM.buildMemoryImage] %s%n", "Index Out of Range");
+				String message = String.format("Index Out Of range - pc: %X,  lineImage: %s", pc, lineImage);
+				appLogger.addError(message);
+			}
 		} // for
 
 	}// saveMemoryImage
@@ -1448,7 +1455,7 @@ public class ASM {// implements Observer
 				appClose();
 			}
 		});
-		frmAsmAssembler.setTitle("ASM - assembler for Zilog Z80  2.0.4");
+		frmAsmAssembler.setTitle("ASM - assembler for Zilog Z80  2.0.5");
 		frmAsmAssembler.setBounds(100, 100, 662, 541);
 		frmAsmAssembler.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		GridBagLayout gridBagLayout = new GridBagLayout();

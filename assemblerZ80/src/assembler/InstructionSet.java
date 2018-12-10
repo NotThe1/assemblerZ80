@@ -459,10 +459,14 @@ public class InstructionSet {
 		branch = new OpCodeNode[] { new OpCodeNode(Z80.patIND_C, "OUT_1") };
 		root.addBranch(branch);
 		
+		branch = new OpCodeNode[] { new OpCodeNode(Z80.patEXP, "OUT_2") };
+		root.addBranch(branch);
+		
 		branch = new OpCodeNode[] { new OpCodeNode(Z80.patEXP_ADD, "OUT_2") };
 		root.addBranch(branch);
+
 		return root;
-	}// rootOUT
+	}// rootOUT   Z80.patEXP
 
 	private static OpCodeNode rootPOP() {
 		root = new OpCodeNode(Z80.patWord, Z80.BAD_OPCODE);

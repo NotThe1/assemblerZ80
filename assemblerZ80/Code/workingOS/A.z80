@@ -1,6 +1,0 @@
-TBA	EQU	0100H
-Start:
-       JR	TBA
-	   JR	TBA1
-	   DS	0FEh
-TBA1:

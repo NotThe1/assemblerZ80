@@ -1,8 +1,9 @@
 package assembler;
 
 /*
- * 	 2018-12-04 Trapped Index Out Of Range Exception.
- *				Set Parent for JOption Pane error report at end of assembly
+ *   2019-03-29	 Removed MyFileChoose, kept dialog on frame 
+ * 	 2018-12-04  Trapped Index Out Of Range Exception.
+ *				 Set Parent for JOption Pane error report at end of assembly
  *   2018-11-23  Added saving Terse setting between sessions
  *   2018-11-22  Fixed problem with non Terse MemFile 
  *   2018-11-20  Fixed problem with resolving Relative Jumps - FM
@@ -60,6 +61,7 @@ import javax.swing.JSplitPane;
 import javax.swing.JTextPane;
 import javax.swing.SwingConstants;
 import javax.swing.border.BevelBorder;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
@@ -125,8 +127,9 @@ public class ASM {// implements Observer
 					appLogger.getWarningCount());
 			JOptionPane.showMessageDialog(frmAsmAssembler, msg);
 
-		}
+		}//if
 	}// start
+	
 
 	private void saveListing() {
 		try {
@@ -837,7 +840,9 @@ public class ASM {// implements Observer
 			} catch (IndexOutOfBoundsException obe) {
 				// System.err.printf("[ASM.buildMemoryImage] %s%n", "Index Out of Range");
 				String message = String.format("Index Out Of range - pc: %X,  lineImage: %s", pc, lineImage);
-				appLogger.addError(message);
+				//appLogger.addError(message);
+				reportError(message);
+
 			}
 		} // for
 
@@ -983,7 +988,8 @@ public class ASM {// implements Observer
 			// ok let it go
 			break;
 		default:
-			appLogger.addError(
+//			appLogger.addError(
+			reportError(
 					String.format("** Check line number %d directive is = %s%n", lineNumber, slp.getDirective()));
 			// look out for Include
 		}// switch
@@ -1170,33 +1176,18 @@ public class ASM {// implements Observer
 	/* ---------------------------------------------------------------------------------- */
 
 	private void openFile() {
-		JFileChooser chooserOpen = MyFileChooser.getFilePicker(defaultDirectory, "Assembler Source Code",
-				SUFFIX_ASSEMBLER_8080, SUFFIX_ASSEMBLER_Z80);
-		if (chooserOpen.showOpenDialog(null) != JFileChooser.APPROVE_OPTION) {
+		JFileChooser fileChooser = new JFileChooser(defaultDirectory);
+		fileChooser.setMultiSelectionEnabled(false);
+		fileChooser.addChoosableFileFilter(new FileNameExtensionFilter("Assembler Source Code",
+				SUFFIX_ASSEMBLER_8080, SUFFIX_ASSEMBLER_Z80));
+		fileChooser.setAcceptAllFileFilterUsed(false);
+		
+		if (fileChooser.showOpenDialog(frmAsmAssembler) != JFileChooser.APPROVE_OPTION) {
 			System.out.printf("%s%n", "You cancelled the file open");
 		} else {
-			// txtSource.setText("");
-			// txtListing.setText("");
-			asmSourceFile = chooserOpen.getSelectedFile();
+			asmSourceFile = fileChooser.getSelectedFile();
 			prepareSourceFile(asmSourceFile);
-			// String asmSourceFileName = asmSourceFile.getName();
-			// String asmSourceDirectory = asmSourceFile.getPath();
-			// String[] nameParts = (asmSourceFileName.split("\\."));
-			// sourceFileBase = nameParts[0];
-			// lblSourceFilePath.setText(asmSourceFile.getAbsolutePath());
-			// sourceFileFullName = asmSourceFile.getAbsolutePath();
-			// lblSourceFileName.setText(asmSourceFile.getName());
-			// lblListingFileName.setText(sourceFileBase + "." + SUFFIX_LISTING);
-			// defaultDirectory = asmSourceFile.getParent();
 			outputPathAndBase = defaultDirectory + FILE_SEPARATOR + sourceFileBase;
-			//
-			// // lblSource.setText(sourceFileName);
-			// // lblListing.setText(replaceWithListingFileName(sourceFileName));
-			// clearDoc(docSource);
-			// clearDoc(docListing);
-			// loadSourceFile(asmSourceFile, 1, null);
-			// tpSource.setCaretPosition(0);
-			// btnStart.setEnabled(true);
 		} // if
 	}// openFile
 
@@ -1363,12 +1354,8 @@ public class ASM {// implements Observer
 	}// main
 
 	private void reportError(String messsage) {
-		String asterisks = "*************";
-		appLogger.addError(asterisks, messsage, asterisks);
-		// insertListing("*************" + System.lineSeparator(), attrRed);
-		// insertListing(messsage + System.lineSeparator(), attrRed);
-		// insertListing("*************" + System.lineSeparator(), attrRed);
-		// lblStatus.setText(ERRORS);
+//		String asterisks = "*************";
+		appLogger.addError(sixteenAsterisks, messsage, sixteenAsterisks);
 	}// reportError
 
 	private void setAttributes() {
@@ -1455,7 +1442,7 @@ public class ASM {// implements Observer
 				appClose();
 			}
 		});
-		frmAsmAssembler.setTitle("ASM - assembler for Zilog Z80  2.0.5");
+		frmAsmAssembler.setTitle("ASM - assembler for Zilog Z80  2.0.6");
 		frmAsmAssembler.setBounds(100, 100, 662, 541);
 		frmAsmAssembler.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		GridBagLayout gridBagLayout = new GridBagLayout();
@@ -1766,6 +1753,8 @@ public class ASM {// implements Observer
 	private static final String stringValuePattern = "\\A'.*'\\z"; // used for
 
 	// private static final int SIXTEEN = 16; // 0X10
+
+	private String sixteenAsterisks = "****************";
 
 	private SimpleAttributeSet attrBlack = new SimpleAttributeSet();
 	private SimpleAttributeSet attrBlue = new SimpleAttributeSet();

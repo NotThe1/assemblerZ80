@@ -1,6 +1,7 @@
 package assembler;
 
 /*
+ * 	 2019-05-06  Refactored Collection.sort(list,String.CASE_INSENSITIVE_ORDER) in SymbolTable
  *   2019-03-29	 Removed MyFileChoose, kept dialog on frame 
  * 	 2018-12-04  Trapped Index Out Of Range Exception.
  *				 Set Parent for JOption Pane error report at end of assembly
@@ -1442,7 +1443,7 @@ public class ASM {// implements Observer
 				appClose();
 			}
 		});
-		frmAsmAssembler.setTitle("ASM - assembler for Zilog Z80  2.0.6");
+		frmAsmAssembler.setTitle("ASM - assembler for Zilog Z80  2.0.7");
 		frmAsmAssembler.setBounds(100, 100, 662, 541);
 		frmAsmAssembler.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		GridBagLayout gridBagLayout = new GridBagLayout();

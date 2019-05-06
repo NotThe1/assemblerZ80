@@ -9,6 +9,7 @@ public class Parser {
 	public Parser() {
 	}// Constructor - Parser
 
+	@SuppressWarnings("unchecked")
 	public ExpressionNode parse(LinkedList<Token> tokens) {
 		this.tokens = (LinkedList<Token>) tokens.clone();
 		lookahead = this.tokens.getFirst();

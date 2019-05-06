@@ -71,6 +71,7 @@ public class SymbolTableEntry {
 	}//setDefinedLineNumber
 
 	ArrayList<Integer> getReferencedLineNumbers() {
+		@SuppressWarnings("unchecked")
 		ArrayList<Integer> lineNumbers = (ArrayList<Integer>) this.referencedLineNumbers.clone();
 		Collections.sort(lineNumbers);
 		return lineNumbers;

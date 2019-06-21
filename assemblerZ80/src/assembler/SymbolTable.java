@@ -106,7 +106,8 @@ public class SymbolTable{
 	}// contains
 
 	public int getType(String symbol) {
-		return symbols.get(symbol).getSymbolType();
+		
+		return symbols.containsKey(symbol)?symbols.get(symbol).getSymbolType():99;
 	}// getType
 
 	public int getDefinedLineNumber(String symbol) {

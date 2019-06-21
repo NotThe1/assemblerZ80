@@ -1443,7 +1443,7 @@ public class ASM {// implements Observer
 				appClose();
 			}
 		});
-		frmAsmAssembler.setTitle("ASM - assembler for Zilog Z80  2.0.7");
+		frmAsmAssembler.setTitle("ASM - assembler for Zilog Z80  2.0.8");
 		frmAsmAssembler.setBounds(100, 100, 662, 541);
 		frmAsmAssembler.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		GridBagLayout gridBagLayout = new GridBagLayout();

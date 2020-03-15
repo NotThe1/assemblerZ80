@@ -5,6 +5,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import appLogger.AppLogger;
+
 public class InstructionSet {
 
 	private static InstructionSet instance = new InstructionSet();
@@ -53,7 +55,7 @@ public class InstructionSet {
 		try{
 		matcher = node.getPattern().matcher(source);
 		}catch (NullPointerException npe){
-			AppLogger.getInstance().addError(source);
+			AppLogger.getInstance().error(source);
 		}
 		if (!matcher.lookingAt()) {
 			return ans;

@@ -6,6 +6,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 
+import appLogger.AppLogger;
+
 public class SymbolTable{
 	
 	private static SymbolTable instance = new SymbolTable();
@@ -50,7 +52,7 @@ public class SymbolTable{
 				return;
 			} //if
 			String error = String.format("Duplicate definition of %s at line # %04d%n", name, lineNumber);
-			appLogger.addError(error);
+			appLogger.error(error);
 		} else { // new symbol
 			symbols.put(name, new SymbolTableEntry(name, value, lineNumber, symbolType));
 		} // if
@@ -74,7 +76,7 @@ public class SymbolTable{
 		} else {
 			String error = String.format("Attempting to reference an undefined symbol: %s on line: %04d",
 					name, lineNumber);
-			appLogger.addError(error);
+			appLogger.error(error);
 		} // if
 	}// referenceSymbol
 
@@ -143,7 +145,7 @@ public class SymbolTable{
 			try {
 				return symbols.get(name).getValue();
 			} catch (NullPointerException npe) {
-				appLogger.addError(String.format("Bad symbol: %s%n", name));
+				appLogger.error(String.format("Bad symbol: %s%n", name));
 				return 0;
 			} // try
 		} // if

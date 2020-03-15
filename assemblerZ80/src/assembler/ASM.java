@@ -1,6 +1,7 @@
 package assembler;
 
 /*
+ * 	 2020-03-09  Removed local AppLogger and replace with reference to it in a Jar
  * 	 2019-05-06  Refactored Collection.sort(list,String.CASE_INSENSITIVE_ORDER) in SymbolTable
  *   2019-03-29	 Removed MyFileChoose, kept dialog on frame 
  * 	 2018-12-04  Trapped Index Out Of Range Exception.
@@ -68,6 +69,8 @@ import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
 
+import appLogger.AppLogger;
+//import appLogger.AppLogger;
 import parser.EvaluationException;
 import parser.ExpressionNode;
 import parser.Parser;
@@ -84,7 +87,8 @@ public class ASM {// implements Observer
 	private SymbolTable symbolTable = SymbolTable.getInstance();
 	private Parser parser = new Parser();
 	private Tokenizer tokenizer = new Tokenizer();
-	private AppLogger appLogger = AppLogger.getInstance();
+//	private AppLogger appLogger = AppLogger.getInstance();
+	private AppLogger log = AppLogger.getInstance();
 
 	private Queue<SourceLineParts> allLineParts;
 	// private HashMap<String, Byte> conditionTable;
@@ -109,7 +113,8 @@ public class ASM {// implements Observer
 		}
 		clearDoc(docSource);
 		clearDoc(docListing);
-		appLogger.resetCounts();
+
+		log.resetCounts();
 		loadSourceFile(asmSourceFile, 1, null);
 		allLineParts = new LinkedList<SourceLineParts>();
 
@@ -123,13 +128,17 @@ public class ASM {// implements Observer
 			saveMemoryFile(memoryImage);
 		} // if memory Image
 		mnuFilePrintListing.setEnabled(true);
-		if (appLogger.getErrorCount() + appLogger.getWarningCount() != 0) {
-			String msg = String.format("There are %d Errors%n and %d Warnings%n", appLogger.getErrorCount(),
-					appLogger.getWarningCount());
+		
+		
+
+		if (log.getErrorCount() + log.getWarningCount() != 0) {
+			String msg = String.format("There are %d Errors%n and %d Warnings%n", log.getErrorCount(),
+					log.getWarningCount());
 			JOptionPane.showMessageDialog(frmAsmAssembler, msg);
 
 		}//if
-	}// start
+		
+		}// start
 	
 
 	private void saveListing() {
@@ -1282,16 +1291,14 @@ public class ASM {// implements Observer
 
 	private Integer resolveRelativeValue(String argument, Integer lineNumber) {
 		Integer ans = null;
-
 		int targetType = symbolTable.getType(argument);
 		if (symbolTable.contains(argument) && (targetType == SymbolTable.LABEL || targetType == SymbolTable.NAME)) {
-
 			// }//if argument in symbol table
 			// if (symbolTable.contains(argument) && symbolTable.getType(argument) == SymbolTable.LABEL) {
 			int nextInstructionLocation = symbolTable.getValue("$") + 2;
 			int symbolValue = symbolTable.getValue(argument);
 			ans = symbolValue - nextInstructionLocation;
-			if ((ans < -124) | (ans > 131)) {
+			if ((ans < -124) || (ans > 131)) {
 				String msg = String.format("[ASM.resolveRelativeValue] Argument out of range %s %x%n", argument,
 						symbolValue);
 				reportError(msg);
@@ -1299,7 +1306,7 @@ public class ASM {// implements Observer
 			} // if
 
 			symbolTable.referenceSymbol(argument, lineNumber);
-			// ans = symbolValue - nextInstructionLocation;
+
 		} else {
 			ans = resolveExpression(argument, lineNumber);
 		}
@@ -1355,8 +1362,7 @@ public class ASM {// implements Observer
 	}// main
 
 	private void reportError(String messsage) {
-//		String asterisks = "*************";
-		appLogger.addError(sixteenAsterisks, messsage, sixteenAsterisks);
+		log.errorCount("*************" +  messsage + "*************");
 	}// reportError
 
 	private void setAttributes() {
@@ -1413,8 +1419,9 @@ public class ASM {// implements Observer
 		sbarSource.addAdjustmentListener(adapterForASM);
 
 		docListing = tpListing.getStyledDocument();
-		appLogger.setDoc(docListing);
-		appLogger.resetCounts();
+		log.setDoc(tpListing.getStyledDocument());
+		log.setDoc(tpListing.getStyledDocument());
+
 		sbarListing = spListing.getVerticalScrollBar();
 		sbarListing.setName(SBAR_LISTING);
 		sbarListing.addAdjustmentListener(adapterForASM);
@@ -1443,7 +1450,7 @@ public class ASM {// implements Observer
 				appClose();
 			}
 		});
-		frmAsmAssembler.setTitle("ASM - assembler for Zilog Z80  2.0.8");
+		frmAsmAssembler.setTitle("ASM - assembler for Zilog Z80  2.1.0");
 		frmAsmAssembler.setBounds(100, 100, 662, 541);
 		frmAsmAssembler.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		GridBagLayout gridBagLayout = new GridBagLayout();

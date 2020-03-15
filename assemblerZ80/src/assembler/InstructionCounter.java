@@ -1,5 +1,7 @@
 package assembler;
 
+import appLogger.AppLogger;
+
 public class InstructionCounter {
 
 	private static InstructionCounter instance = new InstructionCounter();
@@ -87,7 +89,7 @@ public class InstructionCounter {
 			if (currentPage != newPage) {
 				String errMessage = String.format("error in segemnt %s at location %04X", segmentNames[currentSegment],
 						currentLocation);
-				appLogger.addError(errMessage);
+				appLogger.error(errMessage);
 			} // if error!
 		} // if INPAGE
 		lowestLocationSet = Math.min(location[currentSegment], lowestLocationSet);

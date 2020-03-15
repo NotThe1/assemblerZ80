@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="src" path="assemblerZ80/src"/>
+	<classpathentry kind="lib" path="C:/Users/admin/Dropbox/jars/appLogger.jar"/>
+	<classpathentry kind="output" path="assemblerZ80/bin"/>
+</classpath>
